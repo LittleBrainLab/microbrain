@@ -61,9 +61,9 @@ def main(argv):
     
     packaged_pipelines
     --cb - (used for CB_BRAIN data) 1) eddy_cuda 2) modelling tensor 3) subcortical segmentation 4) cortical segmentation 
-        example: microbrain.py -s CB_BRAIN_050 -b [0,1000] --cb
+        example: microbrain.py -s somepath/CB_BRAIN_050 -b [0,1000] --cb
     --all - (used for ALB300 data) 1) gibbs ringing correction 2) eddy_cuda 3) subcortical segmenation 4) cortical segmentation
-        example: microbrain.py -i Ab300_005/study/DTI_1p5mm...45b2500_12/ -s AB300_005 -b [0,1000] --all"""
+        example: microbrain.py -i Ab300_005/study/DTI_1p5mm...45b2500_12/ -s somepath/AB300_005 -b [0,1000] --all"""
 
     try:
         # Note some of these options were left for testing purposes
