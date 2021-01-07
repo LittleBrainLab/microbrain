@@ -13,16 +13,16 @@ from dipy.io import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
 
 sys.path.append('../preprocessing/')
-import dsurf_preproc as dsurf_preproc
+import mbrain_preproc as mbrain_preproc
 
 sys.path.append('../modelling/')
-import dsurf_modelling as dsurf_modelling
+import mbrain_modelling as mbrain_modelling
 
 #sys.path.append('../segmentation/')
-#import dsurf_voxel_segmentation as dsurf_seg
+#import mbrain_voxel_segmentation as mbrain_seg
 
 #sys.path.append('../surfing/')
-#import dsurf_cortical_segmentation as dsurf_cort
+#import mbrain_cortical_segmentation as mbrain_cort
 
 def main(argv):
     inputDir = ''
@@ -41,14 +41,14 @@ def main(argv):
     cort_seg = False
     N4 = True # By default do N4 correction on DWI image based on the bias field from b0
 
-    help_string = """usage: dsurfer.py -s <Subject Directory> -b <bvaluelist> [options]
-    description: dsurfer is a wrapper for diffusion MRI pre/post processing that uses a combination of multiple imaging software packages.  
+    help_string = """usage: microbrain.py -s <Subject Directory> -b <bvaluelist> [options]
+    description: microbrain is a fully automated diffusion MRI analysis pipeline for measurement of grey matter microstructure.  
     Note that options below require the installation of multiple neuroimaging/python analysis software packages (see install instructions).
     VERY BETA Version use with extreme caution. For trouble shooting help contact Graham Little (gtlittle@ualberta.ca)
 
     options: 
     -i <dicom_directory>,--idcm= - uses dcm2niix to convert dicom files to NIFTI which are then placed in a newly created subject directory
-    -s <directory>,--subdir= - specifies the directory which dsurfer will place all processed files
+    -s <directory>,--subdir= - specifies the directory which microbrain will place all processed files
     -b [bval_list],--bvalues= - specify the bvalues to use for diffusion modelling and segmention (for example [0,1000] to use all b0 and b1000 volumes) 
     --gibbs - perform gibbs ringing correction (Kellner et al., 2016) using included third party c program
     --denoise - performs MPPCA denoising (Veraart et al., 2016) via DIPY
@@ -61,9 +61,9 @@ def main(argv):
     
     packaged_pipelines
     --cb - (used for CB_BRAIN data) 1) eddy_cuda 2) modelling tensor 3) subcortical segmentation 4) cortical segmentation 
-        example: dsurfer.py -s CB_BRAIN_050 -b [0,1000] --cb
+        example: microbrain.py -s CB_BRAIN_050 -b [0,1000] --cb
     --all - (used for ALB300 data) 1) gibbs ringing correction 2) eddy_cuda 3) subcortical segmenation 4) cortical segmentation
-        example: dsurfer.py -i Ab300_005/study/DTI_1p5mm...45b2500_12/ -s AB300_005 -b [0,1000] --all"""
+        example: microbrain.py -i Ab300_005/study/DTI_1p5mm...45b2500_12/ -s AB300_005 -b [0,1000] --all"""
 
     try:
         # Note some of these options were left for testing purposes
@@ -172,7 +172,7 @@ def main(argv):
     
     # Given an input folder, convert to NIFTI and output into appropriate folder.
     # Function will skip this step if orig folder already exists with converted NIFTI File
-    [fdwi, fbval, fbvec, fjson, stdout, returncode] = dsurf_preproc.dcm2nii(inputDir, outputDir, 'orig/', subID)
+    [fdwi, fbval, fbvec, fjson, stdout, returncode] = mbrain_preproc.dcm2nii(inputDir, outputDir, 'orig/', subID)
     if returncode != 0:
         print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
         sys.exit()
@@ -185,11 +185,11 @@ def main(argv):
     fout = fdwi
     preproc_suffix = ''
     if denoise:
-        fout = dsurf_preproc.denoiseMPPCA(fout, fbval, fbvec, preprocDir, patch_radius=2)
+        fout = mbrain_preproc.denoiseMPPCA(fout, fbval, fbvec, preprocDir, patch_radius=2)
         preproc_suffix = preproc_suffix + '_DN'
 
     if gibbs:
-        fout, stdout, returncode = dsurf_preproc.gibbsRingingCorrection(fout, preprocDir)
+        fout, stdout, returncode = mbrain_preproc.gibbsRingingCorrection(fout, preprocDir)
         if returncode != 0:
             print('DSurfer: unring.a64 returned an error, make sure it is installed correctly')
             sys.exit()
@@ -199,15 +199,15 @@ def main(argv):
     # mask data using meanB0
     bvals, bvecs = read_bvals_bvecs(fbval, fbvec)
     if mask:
-        fmask, fb0avg, stdout, returncode = dsurf_preproc.fslv6p0_brain_mask(fout,bvals)
+        fmask, fb0avg, stdout, returncode = mbrain_preproc.fslv6p0_brain_mask(fout,bvals)
         if returncode != 0:
             print('DSurfer: bet2 returned an error, make sure it is installed correctly')
             sys.exit()
     else:
-        fmask, fb0avg = dsurf_preproc.fslv6p0_fake_brain_mask(fout,bvals)
+        fmask, fb0avg = mbrain_preproc.fslv6p0_fake_brain_mask(fout,bvals)
 
     if dnnl:
-        fout = dsurf_preproc.denoiseNONLOCAL(fout, fmask, preprocDir)
+        fout = mbrain_preproc.denoiseNONLOCAL(fout, fmask, preprocDir)
         preproc_suffix = preproc_suffix + '_DNNL'
 
     # Eddy current correction
@@ -225,7 +225,7 @@ def main(argv):
         if not json:
             fjson = False
         
-        fout, fbvec_rotated, stdout, returncode = dsurf_preproc.fslv6p0_eddy(fout, facq, findex, fmask, fbval, fbvec, fjson, cuda, preprocDir, preprocDir + 'eddy_output_files/')
+        fout, fbvec_rotated, stdout, returncode = mbrain_preproc.fslv6p0_eddy(fout, facq, findex, fmask, fbval, fbvec, fjson, cuda, preprocDir, preprocDir + 'eddy_output_files/')
         if returncode != 0:
             print("DSurfer: FSL's eddy returned an error, make sure it is installed correctly")
             sys.exit()
@@ -249,19 +249,19 @@ def main(argv):
     if dti_model:
         # Output Average DWI maps for each shell, as well as N4 corrected versions. Note, N4 correction applied to mean DWI not to the raw data itself)
         if N4:
-            fb0, fb0_n4, fdwi, fdwi_n4, stdout, returncode = dsurf_preproc.output_DWI_maps(fb0avg, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell = bval_list[-1])
+            fb0, fb0_n4, fdwi, fdwi_n4, stdout, returncode = mbrain_preproc.output_DWI_maps(fb0avg, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell = bval_list[-1])
             if returncode != 0:
                 print("DSurfer: N4 returned an error, make sure it is installed correctly")
                 sys.exit()
         else: 
-            fb0, fb0_n4, fdwi, fdwi_n4 = dsurf_preproc.output_DWI_maps_noN4(fb0avg, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell = bval_list[-1])
+            fb0, fb0_n4, fdwi, fdwi_n4 = mbrain_preproc.output_DWI_maps_noN4(fb0avg, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell = bval_list[-1])
 
         # Output Tensor and associated diffusion parametric maps
-        ffa, fmd = dsurf_modelling.output_DTI_maps_multishell(fout, fmask, bvals, bvecs, tensorDir, shells = bval_list)
+        ffa, fmd = mbrain_modelling.output_DTI_maps_multishell(fout, fmask, bvals, bvecs, tensorDir, shells = bval_list)
         
         # Will be Implementing this soon
         #if vb_seg:
-        #    dsurf_seg.register_and_segment(fb0_n4, fdwi_n4, ffa, fmask, outputDir, subID, suffix)
+        #    mbrain_seg.register_and_segment(fb0_n4, fdwi_n4, ffa, fmask, outputDir, subID, suffix)
 
         # Will be finishing implementing this soon
         #if cort_seg:
@@ -269,7 +269,7 @@ def main(argv):
         #    src_freesurf_subdir = '/usr/local/freesurfer/subjects/TEMP_CB_BRAIN_CS/'
         #    freesurf_subdir = '/usr/local/freesurfer/subjects/DSURFER_' + subID + '/'
         #    os.system('cp -r ' + src_freesurf_subdir + ' ' + freesurf_subdir)
-        #    dsurf_cort.generate_surfaces_from_dwi(outputDir, subID, preproc_suffix, shell_suffix, freesurf_subdir)
+        #    mbrain_cort.generate_surfaces_from_dwi(outputDir, subID, preproc_suffix, shell_suffix, freesurf_subdir)
     
     print("Total time for processing: ", time() - total_t_start)
     print("")

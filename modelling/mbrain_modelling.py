@@ -21,9 +21,6 @@ from dipy.io import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
 from dipy.reconst.dti import fractional_anisotropy, color_fa
 
-sys.path.append('../preprocessing/')
-import dsurf_preproc as preproc
-
 def fsl_ext():
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
