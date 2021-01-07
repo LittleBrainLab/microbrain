@@ -5,6 +5,7 @@ import glob
 from os import system
 from os import path
 from time import time
+import subprocess
 
 import numpy as np
 
@@ -23,6 +24,14 @@ from dipy.reconst.dti import fractional_anisotropy, color_fa
 sys.path.append('../preprocessing/')
 import dsurf_preproc as preproc
 
+def fsl_ext():
+    fsl_extension = ''
+    if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
+        fsl_extension = '.nii'
+    elif os.environ['FSLOUTPUTTYPE'] == 'NIFTI_GZ':
+        fsl_extension = '.nii.gz'
+    return fsl_extension
+
 def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [0,500,1000], free_water = False, tolerance = 100, nlls = False, ols = False):
     print("Starting DTI Map Generation")
     fbasename = os.path.basename(fname)
@@ -39,8 +48,8 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
     for shell in shells:
         suffix = suffix + 'b' + str(shell)
 
-    fa_fname = tensorDir + fbasename.replace('.nii', suffix + '_FA.nii')
-    md_fname = tensorDir + fbasename.replace('.nii', suffix + '_MD.nii')
+    fa_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_FA' + fsl_ext())
+    md_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_MD' + fsl_ext())
     if not os.path.exists(fa_fname):
 
         img = nib.load(fname)
@@ -54,8 +63,10 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
         for shell in shells:
             b_idx = np.append(b_idx, np.squeeze(np.array(np.where(np.logical_and(bvals < shell + tolerance, bvals > shell - tolerance)))))
         b_idx = b_idx.astype(int)
-        print(b_idx) 
-        print('Bvals',b_idx.shape)
+        print('Modelling Tensor using ' + str(b_idx.shape) + ' volumes:') 
+        print(b_idx)
+        print('Bvals:')
+        print(bvals[b_idx])
 
 
         bvals = bvals[b_idx]
@@ -64,9 +75,8 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
         for i in range(0,data.shape[3]):
             data[mask_data==0,i] = 0
 
-
         gtab = gradient_table(bvals, bvecs)
-        fa_fname = tensorDir + fbasename.replace('.nii', suffix + '_FA.nii')
+        fa_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_FA' + fsl_ext())
 
         t = time()
         if free_water:
@@ -84,7 +94,7 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
         print("Fitting Complete Total time: ", time() - t)
         
         if not os.path.exists(tensorDir):
-            os.system('mkdir ' + tensorDir)
+            subprocess.run(['mkdir', tensorDir], stdout=subprocess.PIPE, universal_newlines=True)
 
         outbase = tensorDir + fbasename
 
@@ -92,34 +102,34 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
         FA[np.isnan(FA)] = 0
 
         fa_img = nib.Nifti1Image(FA.astype(np.float32), img.affine)
-        nib.save(fa_img, outbase.replace('.nii', suffix + '_FA.nii'))
+        nib.save(fa_img, outbase.replace(fsl_ext(), suffix + '_FA' + fsl_ext()))
 
         evecs_img = nib.Nifti1Image(tenfit.evecs.astype(np.float32), img.affine)
-        nib.save(evecs_img, outbase.replace('.nii', suffix + '_EVECS.nii'))
+        nib.save(evecs_img, outbase.replace(fsl_ext(), suffix + '_EVECS' + fsl_ext()))
 
         lt_tensor = tenfit.lower_triangular()
         tensor_img = nib.Nifti1Image(lt_tensor*1000, img.affine)
-        nib.save(tensor_img, outbase.replace('.nii', suffix + '_tensor.nii'))
+        nib.save(tensor_img, outbase.replace(fsl_ext(), suffix + '_tensor' + fsl_ext()))
 
         dir_img = nib.Nifti1Image(np.squeeze(tenfit.directions.astype(np.float32)), img.affine)
-        nib.save(dir_img, outbase.replace('.nii',suffix + '_Primary_Direction.nii'))
+        nib.save(dir_img, outbase.replace(fsl_ext(),suffix + '_Primary_Direction' + fsl_ext()))
 
         MD = dti.mean_diffusivity(tenfit.evals)
-        nib.save(nib.Nifti1Image(MD.astype(np.float32), img.affine), outbase.replace('.nii',suffix + '_MD.nii'))
+        nib.save(nib.Nifti1Image(MD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), suffix + '_MD' + fsl_ext()))
 
         RD = tenfit.rd
-        nib.save(nib.Nifti1Image(RD.astype(np.float32), img.affine), outbase.replace('.nii',suffix + '_RD.nii'))
+        nib.save(nib.Nifti1Image(RD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), suffix + '_RD' + fsl_ext()))
 
         AD = tenfit.ad
-        nib.save(nib.Nifti1Image(AD.astype(np.float32), img.affine), outbase.replace('.nii',suffix + '_AD.nii'))
+        nib.save(nib.Nifti1Image(AD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), suffix + '_AD' + fsl_ext()))
 
         FA = np.clip(FA, 0, 1)
         RGB = color_fa(FA, tenfit.evecs)
-        nib.save(nib.Nifti1Image(np.array(255 * RGB, 'uint8'), img.affine), outbase.replace('.nii',suffix + '_FA_RGB.nii'))
+        nib.save(nib.Nifti1Image(np.array(255 * RGB, 'uint8'), img.affine), outbase.replace(fsl_ext(),suffix + '_FA_RGB' + fsl_ext()))
 
         if free_water:
             FW = tenfit.f
-            nib.save(nib.Nifti1Image(FW.astype(np.float32), img.affine), outbase.replace('.nii',suffix + '_FW.nii'))
+            nib.save(nib.Nifti1Image(FW.astype(np.float32), img.affine), outbase.replace(fsl_ext(), suffix + '_FW' + fsl_ext()))
     else:
         print("DTI Tensor Files Already Exist: Skipping")
 
@@ -129,7 +139,7 @@ def output_DKI_maps(fname, fmask, bvals, bvecs, dkiDir):
     print("Starting DKI Map Generation")
     prefix = 'dki'
     fbasename = os.path.basename(fname) 
-    fa_fname = dkiDir + fbasename.replace('.nii', '_' + prefix + '_FA.nii')
+    fa_fname = dkiDir + fbasename.replace(fsl_ext(), '_' + prefix + '_FA' + fsl_ext())
     if not os.path.exists(fa_fname):
 
         img = nib.load(fname)
@@ -151,7 +161,7 @@ def output_DKI_maps(fname, fmask, bvals, bvecs, dkiDir):
         print("Fitting Complete Total time:", time() - t)
         
         if not os.path.exists(dkiDir):
-            os.system('mkdir ' + dkiDir)
+            subprocess.run(['mkdir', dkiDir], stdout=subprocess.PIPE, universal_newlines=True)
 
         outbase = dkiDir + fbasename
 
@@ -159,39 +169,39 @@ def output_DKI_maps(fname, fmask, bvals, bvecs, dkiDir):
         FA[np.isnan(FA)] = 0
 
         fa_img = nib.Nifti1Image(FA.astype(np.float32), img.affine)
-        nib.save(fa_img, outbase.replace('.nii', '_' + prefix + '_FA.nii'))
+        nib.save(fa_img, outbase.replace(fsl_ext(), '_' + prefix + '_FA' + fsl_ext()))
 
         MD = dkifit.md
-        nib.save(nib.Nifti1Image(MD.astype(np.float32), img.affine), outbase.replace('.nii','_' + prefix + '_MD.nii'))
+        nib.save(nib.Nifti1Image(MD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), '_' + prefix + '_MD' + fsl_ext()))
 
         RD = dkifit.rd
-        nib.save(nib.Nifti1Image(RD.astype(np.float32), img.affine), outbase.replace('.nii','_' + prefix + '_RD.nii'))
+        nib.save(nib.Nifti1Image(RD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), '_' + prefix + '_RD' + fsl_ext()))
 
         AD = dkifit.ad
-        nib.save(nib.Nifti1Image(AD.astype(np.float32), img.affine), outbase.replace('.nii','_' + prefix + '_AD.nii'))
+        nib.save(nib.Nifti1Image(AD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), '_' + prefix + '_AD' + fsl_ext()))
 
         FA = np.clip(FA, 0, 1)
         RGB = color_fa(FA, dkifit.evecs)
-        nib.save(nib.Nifti1Image(np.array(255 * RGB, 'uint8'), img.affine), outbase.replace('.nii','_' + prefix + '_FA_RGB.nii'))
+        nib.save(nib.Nifti1Image(np.array(255 * RGB, 'uint8'), img.affine), outbase.replace(fsl_ext(),'_' + prefix + '_FA_RGB' + fsl_ext()))
     
         MK = dkifit.mk(0,3)
-        nib.save(nib.Nifti1Image(MK.astype(np.float32), img.affine), outbase.replace('.nii','_' + prefix + '_MK.nii'))
+        nib.save(nib.Nifti1Image(MK.astype(np.float32), img.affine), outbase.replace(fsl_ext(), '_' + prefix + '_MK' + fsl_ext()))
 
         RK = dkifit.rk(0,3)
-        nib.save(nib.Nifti1Image(RK.astype(np.float32), img.affine), outbase.replace('.nii','_' + prefix + '_RK.nii'))
+        nib.save(nib.Nifti1Image(RK.astype(np.float32), img.affine), outbase.replace(fsl_ext(),'_' + prefix + '_RK' + fsl_ext()))
 
         AK = dkifit.ak(0,3)
-        nib.save(nib.Nifti1Image(AK.astype(np.float32), img.affine), outbase.replace('.nii','_' + prefix + '_AK.nii'))
+        nib.save(nib.Nifti1Image(AK.astype(np.float32), img.affine), outbase.replace(fsl_ext(),'_' + prefix + '_AK' + fsl_ext()))
     
         evecs_img = nib.Nifti1Image(dkifit.evecs.astype(np.float32), img.affine)
-        nib.save(evecs_img, outbase.replace('.nii', '_' + prefix + '_EVECS.nii'))
+        nib.save(evecs_img, outbase.replace(fsl_ext(), '_' + prefix + '_EVECS' + fsl_ext()))
     
         lt_tensor = dkifit.lower_triangular()
         tensor_img = nib.Nifti1Image(lt_tensor*1000, img.affine)
-        nib.save(tensor_img, outbase.replace('.nii', '_' + prefix + '_tensor.nii'))
+        nib.save(tensor_img, outbase.replace(fsl_ext(), '_' + prefix + '_tensor' + fsl_ext()))
 
         dir_img = nib.Nifti1Image(np.squeeze(dkifit.directions.astype(np.float32)), img.affine)
-        nib.save(dir_img, outbase.replace('.nii', '_' + prefix + '_Primary_Direction.nii'))
+        nib.save(dir_img, outbase.replace(fsl_ext(), '_' + prefix + '_Primary_Direction' + fsl_ext()))
     else:
         print("DKI Files Already Exist: Skipping")
 
