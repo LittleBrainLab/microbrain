@@ -18,11 +18,11 @@ import dsurf_preproc as dsurf_preproc
 sys.path.append('../modelling/')
 import dsurf_modelling as dsurf_modelling
 
-sys.path.append('../segmentation/')
-import dsurf_voxel_segmentation as dsurf_seg
+#sys.path.append('../segmentation/')
+#import dsurf_voxel_segmentation as dsurf_seg
 
-sys.path.append('../surfing/')
-import dsurf_cortical_segmentation as dsurf_cort
+#sys.path.append('../surfing/')
+#import dsurf_cortical_segmentation as dsurf_cort
 
 def main(argv):
     inputDir = ''
@@ -39,6 +39,7 @@ def main(argv):
     dti_model = False
     vb_seg = False
     cort_seg = False
+    N4 = True # By default do N4 correction on DWI image based on the bias field from b0
 
     help_string = """usage: dsurfer.py -s <Subject Directory> -b <bvaluelist> [options]
     description: dsurfer is a wrapper for diffusion MRI pre/post processing that uses a combination of multiple imaging software packages.  
@@ -53,6 +54,7 @@ def main(argv):
     --denoise - performs MPPCA denoising (Veraart et al., 2016) via DIPY
     --dnnl - performs Non-Local means denoising (Coupe et al., 2011) via DIPY
     --eddy, --eddy_cuda - performs eddy current correction (Anderson et al., 2016) via FSL v6.0 or higher. CUDA mode runs faster if CUDA setup on NVIDIA GPU
+    --no-N4 - does not perform N4 correction (Tustison el al., 2010) via ANTS, useful flag when data is prescan normalized (Siemens)
     --no-json - if no .json image acquistion specification file available will run without this file
     --subcort_seg - perform surface based subcortical segmentation (Little et al., 2021, ISMRM) via MIRTK
     --cort_seg - perform surface based cortical segmentation (Little et al., 2021, NeuroImage) via MIRTK
@@ -65,7 +67,7 @@ def main(argv):
 
     try:
         # Note some of these options were left for testing purposes
-        opts, args = getopt.getopt(argv,"hs:b:i:",["idcm=","subdir=","bvalues=", "denoise","dnnl", "gibbs", "eddy", "eddy_cuda", "no-json","all","segall", "hcp", "cb","allxeddy", "allxn4","allxcort"])
+        opts, args = getopt.getopt(argv,"hs:b:i:",["idcm=","subdir=","bvalues=", "denoise","dnnl", "gibbs", "eddy", "eddy_cuda", "no-json","no-N4","all","segall", "hcp", "cb","allxeddy", "allxn4","allxcort"])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -107,6 +109,8 @@ def main(argv):
             eddy = True
         elif opt in ("--no-json"):
             json = False
+        elif opt in ("--no-N4"):
+            N4 = False
         elif opt in ("--segall"):
             vb_seg = True
             cort_seg = True
@@ -158,7 +162,6 @@ def main(argv):
             dti_model = True
             vb_seg = True
             cort_seg = True
-
 
     outputDir, subID = os.path.split(outputDir)
     print('Processing:' + subID)

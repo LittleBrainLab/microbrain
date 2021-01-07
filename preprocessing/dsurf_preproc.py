@@ -32,7 +32,6 @@ def fsl_ext():
     return fsl_extension
 
 def dcm2nii(dataDir, outDir, rawDir, thisSub):
-    print(os.environ['FSLOUTPUTTYPE'])
     subDir = outDir + '/' + thisSub + '/'
     if not os.path.exists(subDir):
         subprocess.run(['mkdir', subDir], stdout=subprocess.PIPE, universal_newlines=True)
@@ -172,7 +171,7 @@ def denoiseNONLOCAL(fdwi, fmask, denoiseDir):
     return fdenoise
 
 def fslv6p0_fake_brain_mask(fgibbs,bvals, tolerance=100):
-    print("Performing Fake Brain Mask Extraction (FSLv6.0 bet2)")
+    print("Performing Fake Brain Mask Extraction (FSL bet2)")
     
     fb0avg = fgibbs.replace(fsl_ext(), '_b0avg' + fsl_ext())
     in_file = fb0avg
@@ -195,7 +194,7 @@ def fslv6p0_fake_brain_mask(fgibbs,bvals, tolerance=100):
     return fmask, fb0avg
 
 def fslv6p0_brain_mask(fgibbs,bvals, tolerance=100):
-    print("Performing Brain Mask Extraction (FSLv6.0 bet2)")
+    print("Performing Brain Mask Extraction (FSL bet2)")
     t = time()
     fb0avg = fgibbs.replace(fsl_ext(), '_b0avg' + fsl_ext())
     in_file = fb0avg
@@ -299,15 +298,15 @@ def fslv6p0_eddy(fdwi, facq, findex, fmask, fbval, fbvec, fjson, cuda, eddyDir, 
     return feddy, fbvec_rotated, stdout, return_code
 
 def n4correct_by_b0(fb0avg, fmask, fgibbs, preprocDWIDir):
-    print("N4 correction (dHCP toolbox)")
+    print("N4 correction (ANTS)")
     t = time()
 
     fn4correct = fb0avg.replace(fsl_ext(),'_n4' + fsl_ext())
     fbias = fn4correct.replace(fsl_ext(),'_bias' + fsl_ext())
 
     if not os.path.exists(fn4correct):
-        if is_tool('N4'):
-                process = subprocess.run(['N4',
+        if is_tool('N4BiasFieldCorrection'):
+                process = subprocess.run(['N4BiasFieldCorrection',
                                 '-i', fb0avg,
                                 '-x',fmask,
                                 '-o', '[' + fn4correct + ',' + fbias + ']'],
@@ -345,7 +344,7 @@ def n4correct_by_b0(fb0avg, fmask, fgibbs, preprocDWIDir):
 def output_DWI_maps(fb0avg, fmask, feddy, bvals, shells, meanDWIDir, preproc_suffix, dwi_shell = 1000, tolerance = 100):
     
     shell_tolerance = 50 # multiband doesn't prescribe the exact b-value
-    print("N4 correction (dHCP toolbox)")
+    print("N4 correction (ANTS)")
     t = time()
     
     if not os.path.exists(meanDWIDir):
@@ -355,8 +354,8 @@ def output_DWI_maps(fb0avg, fmask, feddy, bvals, shells, meanDWIDir, preproc_suf
     fbias = fn4correct.replace(fsl_ext(),'_bias' + fsl_ext())
 
     if not os.path.exists(fn4correct):
-        if is_tool('N4'):
-                process = subprocess.run(['N4',
+        if is_tool('N4BiasFieldCorrection'):
+                process = subprocess.run(['N4BiasFieldCorrection',
                                 '-i', fb0avg,
                                 '-x',fmask,
                                 '-o', '[' + fn4correct + ',' + fbias + ']'],
@@ -407,7 +406,7 @@ def output_DWI_maps(fb0avg, fmask, feddy, bvals, shells, meanDWIDir, preproc_suf
 def output_DWI_maps_noN4(fb0avg, fmask, feddy, bvals, shells, meanDWIDir, preproc_suffix, dwi_shell = 1000, tolerance = 100):
 
     shell_tolerance = 50 # multiband doesn't prescribe the exact b-value
-    print("No N4 correction (dHCP toolbox)")
+    print("No N4 correction")
     t = time()
 
     if not os.path.exists(meanDWIDir):
