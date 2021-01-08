@@ -193,7 +193,7 @@ def fslv6p0_fake_brain_mask(fgibbs,bvals, tolerance=100):
 
     return fmask, fb0avg
 
-def fslv6p0_brain_mask(fgibbs,bvals, tolerance=100):
+def fslv6p0_brain_mask(fgibbs,bvals, fval, gval, tolerance=100):
     print("Performing Brain Mask Extraction (FSL bet2)")
     t = time()
     fb0avg = fgibbs.replace(fsl_ext(), '_b0avg' + fsl_ext())
@@ -216,8 +216,8 @@ def fslv6p0_brain_mask(fgibbs,bvals, tolerance=100):
                                 fb0avg,
                                 out_file,
                                 '-m',
-                                '-f', '0.15',
-                                '-g', '0.1'],
+                                '-f', str(fval),
+                                '-g', str(gval)],
                             stdout=subprocess.PIPE,
                             universal_newlines=True)
                 print("BET2 finished masking, Processing Time: ", time() - t)
