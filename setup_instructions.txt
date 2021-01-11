@@ -1,0 +1,38 @@
+Step 1) Install/Add Third Party Programs to Path:
+
+If Graham has given you a ThirdPartyApp.zip archive, unzip it in any location and add the following to your .bashrc terminal startup file
+export PATH="location-of-folder/ThirdPartyApps/:$PATH"
+
+if the following which commands return a path then you can proceed to step 2.
+which dcm2niix
+which unring.a64
+which N4BiasFieldCorrection
+which mirtk
+
+The ThirdPartyApp.zip includes 4 following binary files needed for MicroBrain to run.
+  dcm2niix - used to convert dicom to nifti, github located https://github.com/rordenlab/dcm2niix
+  unring.a64 - gibbs ringing correction binary (Note: uses 64bit architecture), can be downloaded from https://bitbucket.org/reisert/unring if needed
+  N4BiasFieldCorrection - used to normalize signal intensities on the mean DWI image, is included in the ANTS image analysis software package if necessary
+  mirtk - used to do surface-based segmentation of subcortical structures and cortex, information about this toolbox can be found at https://mirtk.github.io/
+
+If you don't have the ThirdPartyApp.zip, the easiest way to install mirtk is to run the following commands. Note the release version may change in the following link.
+wget -O mirtk https://bintray.com/schuhschuh/AppImages/download_file?file_path=MIRTK%2Bview-latest-x86_64-glibc2.15.AppImage
+chmod a+x mirtk
+sudo mv mirtk /usr/bin
+
+Step 2) Install FSL v6.0 or higher from https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation.
+	Note: FSL is needed to run the above unring.a64 command, and has multiple other uses in MicroBrain including Eddy current correction and brain masking.
+
+Step 3) Install cuda libraries so that you can run FSL eddy_cuda9.1, which is way faster then normal eddy command 
+sudo apt-get install libcudart9.1
+sudo apt-get install libcublas9.1
+
+Step 3) Install python modules.
+	MicroBrain does most of it's image processing in python, the required python packages can be installed as follows. 
+
+sudo apt install python3-pip
+pip3 install nibabel --user
+pip3 install dipy --user
+pip3 install fury --user
+
+
