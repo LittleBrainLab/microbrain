@@ -242,7 +242,7 @@ def fslv6p0_eddy(fdwi, facq, findex, fmask, fbval, fbvec, fjson, cuda, eddyDir, 
         subprocess.run(['mkdir', eddyDir], stdout=subprocess.PIPE, universal_newlines=True)
 
     if cuda:
-        eddy_command = 'eddy_cuda9.1'
+        eddy_command = 'eddy_cuda'
     else:
         eddy_command = 'eddy'
 
