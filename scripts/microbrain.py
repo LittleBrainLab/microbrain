@@ -20,8 +20,8 @@ import mbrain_preproc as mbrain_preproc
 sys.path.append('../modelling/')
 import mbrain_modelling as mbrain_modelling
 
-#sys.path.append('../segmentation-v2/')
-#import mbrain_segment as mbrain_seg
+sys.path.append('../subcort_segmentation/')
+import mbrain_segment as mbrain_seg
 
 #sys.path.append('../surfing/')
 #import mbrain_cortical_segmentation as mbrain_cort
@@ -522,9 +522,9 @@ def main(argv):
         else:
             fb0, fb0_n4, fdwi, fdwi_n4 = mbrain_preproc.output_DWI_maps_noN4(ffirstb0_undistort, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell = bval_list[-1])
 
-        ## Surface-based deformation subcortical segmentation
-        #if diffusion_seg:
-        #    mbrain_seg.segment(fmask, outputDir, subID, preproc_suffix, shell_suffix, bval_list, cpu_num=proc_num)
+        # Surface-based deformation subcortical segmentation
+        if diffusion_seg:
+            mbrain_seg.segment(fmask, outputDir, subID, preproc_suffix, shell_suffix, bval_list, cpu_num=proc_num)
 
         ## Surface-based deformation cortical segmentation
         #if cort_seg:
