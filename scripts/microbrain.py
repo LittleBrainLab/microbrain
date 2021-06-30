@@ -20,8 +20,8 @@ import mbrain_preproc as mbrain_preproc
 sys.path.append('../modelling/')
 import mbrain_modelling as mbrain_modelling
 
-sys.path.append('../segmentation-v2/')
-import mbrain_segment as mbrain_seg
+#sys.path.append('../segmentation-v2/')
+#import mbrain_segment as mbrain_seg
 
 #sys.path.append('../surfing/')
 #import mbrain_cortical_segmentation as mbrain_cort
