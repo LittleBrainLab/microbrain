@@ -16,7 +16,7 @@ The ThirdPartyApp.zip includes 4 following binary files needed for MicroBrain to
   mirtk - used to do surface-based segmentation of subcortical structures and cortex, information about this toolbox can be found at https://mirtk.github.io/
 
 If you don't have the ThirdPartyApp.zip, the easiest way to install mirtk is to run the following commands. Note the release version may change in the following link.
-wget -O mirtk https://bintray.com/schuhschuh/AppImages/download_file?file_path=MIRTK%2Bview-latest-x86_64-glibc2.15.AppImage
+wget -O mirtk https://bintray.com/schuhschuh/AppImages/download_file?file_path=MIRTK-latest-x86_64-glibc2.14.AppImage
 chmod a+x mirtk
 sudo mv mirtk /usr/bin
 

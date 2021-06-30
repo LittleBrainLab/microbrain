@@ -46,7 +46,13 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
         suffix = suffix + 'b' + str(shell)
 
     fa_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_FA' + fsl_ext())
+    fa_rgb_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_FA_RGB' + fsl_ext())
     md_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_MD' + fsl_ext())
+    ad_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_AD' + fsl_ext())
+    rd_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_RD' + fsl_ext())
+    evec_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_EVECS' + fsl_ext())
+    pevec_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_Primary_Direction' + fsl_ext())
+    tensor_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_tensor' + fsl_ext())
     if not os.path.exists(fa_fname):
 
         img = nib.load(fname)
@@ -82,7 +88,8 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
         elif ols:
             tenmodel = dti.TensorModel(gtab, fit_method='LS')
         elif nlls:
-            tenmodel = dti.TensorModel(gtab, fit_method='NLLS', weighting='gmm')
+            print("Fitting Tensor using NLLS and SIGMA")
+            tenmodel = dti.TensorModel(gtab, fit_method='NLLS')
         else:
             print("Fitting Tensor")
             tenmodel = dti.TensorModel(gtab)
@@ -99,30 +106,30 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
         FA[np.isnan(FA)] = 0
 
         fa_img = nib.Nifti1Image(FA.astype(np.float32), img.affine)
-        nib.save(fa_img, outbase.replace(fsl_ext(), suffix + '_FA' + fsl_ext()))
+        nib.save(fa_img, fa_fname)
 
         evecs_img = nib.Nifti1Image(tenfit.evecs.astype(np.float32), img.affine)
-        nib.save(evecs_img, outbase.replace(fsl_ext(), suffix + '_EVECS' + fsl_ext()))
+        nib.save(evecs_img, evec_fname)
 
         lt_tensor = tenfit.lower_triangular()
         tensor_img = nib.Nifti1Image(lt_tensor*1000, img.affine)
-        nib.save(tensor_img, outbase.replace(fsl_ext(), suffix + '_tensor' + fsl_ext()))
+        nib.save(tensor_img, tensor_fname)
 
         dir_img = nib.Nifti1Image(np.squeeze(tenfit.directions.astype(np.float32)), img.affine)
-        nib.save(dir_img, outbase.replace(fsl_ext(),suffix + '_Primary_Direction' + fsl_ext()))
+        nib.save(dir_img, pevec_fname)
 
         MD = dti.mean_diffusivity(tenfit.evals)
-        nib.save(nib.Nifti1Image(MD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), suffix + '_MD' + fsl_ext()))
+        nib.save(nib.Nifti1Image(MD.astype(np.float32), img.affine), md_fname)
 
         RD = tenfit.rd
-        nib.save(nib.Nifti1Image(RD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), suffix + '_RD' + fsl_ext()))
+        nib.save(nib.Nifti1Image(RD.astype(np.float32), img.affine), rd_fname)
 
         AD = tenfit.ad
-        nib.save(nib.Nifti1Image(AD.astype(np.float32), img.affine), outbase.replace(fsl_ext(), suffix + '_AD' + fsl_ext()))
+        nib.save(nib.Nifti1Image(AD.astype(np.float32), img.affine), ad_fname)
 
         FA = np.clip(FA, 0, 1)
         RGB = color_fa(FA, tenfit.evecs)
-        nib.save(nib.Nifti1Image(np.array(255 * RGB, 'uint8'), img.affine), outbase.replace(fsl_ext(),suffix + '_FA_RGB' + fsl_ext()))
+        nib.save(nib.Nifti1Image(np.array(255 * RGB, 'uint8'), img.affine), fa_rgb_fname)
 
         if free_water:
             FW = tenfit.f
@@ -130,7 +137,8 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
     else:
         print("DTI Tensor Files Already Exist: Skipping")
 
-    return fa_fname, md_fname
+    return fa_fname, md_fname, fa_rgb_fname, ad_fname, rd_fname, evec_fname, pevec_fname, tensor_fname
+
 
 def output_DKI_maps(fname, fmask, bvals, bvecs, dkiDir):
     print("Starting DKI Map Generation")
