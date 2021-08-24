@@ -23,8 +23,9 @@ import mbrain_modelling as mbrain_modelling
 sys.path.append('../subcort_segmentation/')
 import mbrain_segment as mbrain_seg
 
-#sys.path.append('../surfing/')
-#import mbrain_cortical_segmentation as mbrain_cort
+sys.path.append('../surfing/')
+import mbrain_cortical_segmentation as mbrain_cort
+
 def fsl_ext():
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
@@ -62,6 +63,7 @@ def main(argv):
     json = True
     dti_model = False
     diffusion_seg = False
+    cort_seg = False
     freesurfDir = False
     N4 = True # By default do N4 correction on DWI image based on the bias field from b0
     cpu_num = 0
@@ -123,7 +125,7 @@ def main(argv):
 
     try:
         # Note some of these options were left for testing purposes
-        opts, args = getopt.getopt(argv,"hs:b:i:",["idcm=","subdir=","bvalues=", "bet-mask", "microbrain-mask", "explicit-mask=","pe_direction=","EffectiveEcho=", "AcqReadout=", "rerun-mask", "dmppca", "dnlsam", "cpu-num=","gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "freesurf-dir=", "hcp", "cb","allxeddy", "allxn4", "stabilize"])
+        opts, args = getopt.getopt(argv,"hs:b:i:",["idcm=","subdir=","bvalues=", "bet-mask", "microbrain-mask", "explicit-mask=","pe_direction=","EffectiveEcho=", "AcqReadout=", "rerun-mask", "dmppca", "dnlsam", "cpu-num=","gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb","allxeddy", "allxn4", "stabilize"])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -187,6 +189,8 @@ def main(argv):
             proc_num = int(arg)
         elif opt in ("--mbrain-seg"):
             diffusion_seg = True
+        elif opt in ("--mbrain-cort"):
+            cort_seg = True
         elif opt in ("--freesurf-dir"):
             freesurfDir = os.path.normpath(arg)
         elif opt in ("--all"):
@@ -481,6 +485,11 @@ def main(argv):
             #fmask = fmask_dil
         else:
             fmask_eddy = fmask
+        
+        # Make sure mask has same dimensions as first b0 volume (sometimes prerproc steps mess this up)
+        ffirstVol = fout.replace(fsl_ext(), '_firstVol' + fsl_ext())
+        process = subprocess.run(['fslroi', fout, ffirstVol,'0','1'], stdout=subprocess.PIPE, universal_newlines=True)
+        process = subprocess.run(['fslcpgeom', ffirstVol, fmask_eddy], stdout=subprocess.PIPE, universal_newlines=True)
 
         fout, fbvec_rotated, stdout, returncode = mbrain_preproc.fslv6p0_eddy(fout, facq, findex, fmask_eddy, fbval, fbvec, fjson, ftopup, ffieldmap_hz_reg2firstb0, cuda, preprocDir, preprocDir + 'eddy_output_files/')
         if returncode != 0:
@@ -526,14 +535,14 @@ def main(argv):
         if diffusion_seg:
             mbrain_seg.segment(fmask, outputDir, subID, preproc_suffix, shell_suffix, bval_list, cpu_num=proc_num)
 
-        ## Surface-based deformation cortical segmentation
-        #if cort_seg:
-        #    print("DSurfing")
-        #    src_tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/TEMP_CB_BRAIN_CS/'
-        #    tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/DSURFER_' + subID + '/'
-        #    os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
-        #    mbrain_cort.generate_surfaces_from_dwi(outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir)
-    
+        # Surface-based deformation cortical segmentation
+        if cort_seg:
+            src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
+            tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
+            os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
+            mbrain_cort.generate_surfaces_from_dwi(outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir)
+            os.system('rm -r ' + tmp_freesurf_subdir)
+
     print("Total time for processing: ", time() - total_t_start)
     print("")
 

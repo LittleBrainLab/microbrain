@@ -15,6 +15,8 @@ from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 
 import matplotlib.pyplot as plt
 
+from os import system
+
 def fsl_ext():
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
@@ -140,19 +142,202 @@ def msm_reg(wm_sphere_gii, ref_sphere_gii, wm_sulc_gii, ref_sulc_gii, hemi, conf
 
 def generate_initial_lr_wm(subDir, thisSub, suffix, surfDir):
 
-    fseg = subDir + 'voxel_based_segmentation/' + thisSub + suffix + '_tissue_seg_init' + fsl_ext()
+    tissueDir = subDir + 'tissue_classification/'
+    segDir = subDir + 'subcortical_segmentation/'
+    regDir = subDir + 'registration/'
+
+    internal_struct_label = ['LEFT_THALAMUS',
+                    'LEFT_CAUDATE',
+                    'LEFT_PUTAMEN',
+                    'LEFT_GLOBUS',
+                    'LEFT_ACCUMBENS',
+                    'RIGHT_THALAMUS',
+                    'RIGHT_CAUDATE',
+                    'RIGHT_PUTAMEN',
+                    'RIGHT_GLOBUS',
+                    'RIGHT_ACCUMBENS']
+
+    external_struct_label = ['LEFT_HIPPO',
+                             'LEFT_AMYGDALA',
+                             'RIGHT_HIPPO',
+                             'RIGHT_AMYGDALA']
+
+    thalamus_struct_label = ['LEFT_THALAMUS',
+                             'RIGHT_THALAMUS']
+
+    # Make mask of internal structures
+    pseudo_white = np.zeros(nib.load(segDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
+    for thisLabel in internal_struct_label:
+        thisStructFile = segDir + thisSub + '_refined_' + thisLabel + fsl_ext()
+        pseudo_white[nib.load(thisStructFile).get_data() > 0] = 1
+
+    internal_mask = np.copy(pseudo_white)
+
+    external_mask = np.zeros(nib.load(segDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
+    for thisLabel in external_struct_label:
+        thisStructFile = segDir + thisSub + '_refined_' + thisLabel + fsl_ext()
+        external_mask[nib.load(thisStructFile).get_data() > 0] = 1
+
+    thalamus_label = np.zeros(nib.load(segDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
+    for thisLabel in thalamus_struct_label:
+        thisStructFile = segDir + thisSub + '_refined_' + thisLabel + fsl_ext()
+        thalamus_label[nib.load(thisStructFile).get_data() > 0] = 1
+
+    # Get WM segmentation
+    fseg = tissueDir + 'tissue_prob_final_out_seg'  + fsl_ext()
     seg_img = nib.load(fseg)
     seg_data = seg_img.get_data()
+    pseudo_white[seg_data == 2] = 1
+    pseudo_white[external_mask == 1] = 0
+
+    # Read in harvard atlas to separate sub structures
+    fharvard = regDir + 'HarvardOxford-sub-prob-1mm_flirt_native'  + fsl_ext()
+    harvard_img = nib.load(fharvard)
+    harvard_data = harvard_img.get_data()
+
+    fmni =  regDir + 'MNI-prob-1mm_flirt_native'  + fsl_ext()
+    mni_img = nib.load(fmni)
+    mni_data = mni_img.get_data()
+
+    # Generate Cerrebellum, brainstem and ventricle segmentations
+    # Output tissue masks
+    ffa = subDir + 'DTI_maps/' + thisSub + suffix + '_FA' + fsl_ext()
+    fdwi = subDir + 'meanDWI/' + thisSub + '_DNLSAM_GR_EDDY_mean_b1000_n4' + fsl_ext() ## Fix this hard coded suffix
+    dwi_img = nib.load(fdwi)
+
+    fgm_mask = surfDir + thisSub + suffix + '_gm_mask' + fsl_ext()
+    gm_mask = np.zeros(seg_data.shape)
+    gm_mask[seg_data == 1] = 1
+    nib.save(nib.Nifti1Image(gm_mask, dwi_img.affine), fgm_mask)
+
+    fwm_mask = surfDir + thisSub + suffix + '_wm_mask' + fsl_ext()
+    wm_mask = np.zeros(seg_data.shape)
+    wm_mask[seg_data == 2] = 1
+    nib.save(nib.Nifti1Image(wm_mask, dwi_img.affine), fwm_mask)
+
+    fcsf_mask = surfDir + thisSub + suffix + '_csf_mask' + fsl_ext()
+    csf_mask = np.zeros(seg_data.shape)
+    csf_mask[seg_data == 3] = 1
+    nib.save(nib.Nifti1Image(csf_mask, dwi_img.affine), fcsf_mask)
+
+    # Output cerebral GM and cerebellar probs
+    gm_prob = nib.load(tissueDir + 'tissue_prob_final_out_prob_GM'  + fsl_ext()).get_data()
+    wm_prob = nib.load(tissueDir + 'tissue_prob_final_out_prob_WM'  + fsl_ext()).get_data()
+    csf_prob = nib.load(tissueDir + 'tissue_prob_final_out_prob_CSF'  + fsl_ext()).get_data()
+    vent_prob = harvard_data[:,:,:,2] + harvard_data[:,:,:,13]
+    brain_stem_prob = harvard_data[:,:,:,7]
+    cerebellum_prob = mni_data[:,:,:,1]/100
+
+    gm_prob[cerebellum_prob > 0] = 0
+    wm_prob[brain_stem_prob > 0] = 0
+    wm_prob[cerebellum_prob > 0] = 0
+    csf_prob[vent_prob > 0] = 0
     
+    # Segment GM into Cerebellum GM / cerebrum GM
+    atropos_gm_base = surfDir + thisSub + suffix + 'GM_'
+    atropos_gm_label = atropos_gm_base + 'label' + fsl_ext()
+    
+    atropos_gm_prob = atropos_gm_base + '01' + fsl_ext()
+    nib.save(nib.Nifti1Image(gm_prob, dwi_img.affine), atropos_gm_prob)
+
+    atropos_cerebellum_prob = atropos_gm_base + '02' + fsl_ext()
+    nib.save(nib.Nifti1Image(cerebellum_prob, dwi_img.affine), atropos_cerebellum_prob)
+    
+    if not os.path.exists(atropos_gm_label):
+        system('Atropos -d 3' +
+                ' -a [' + fdwi + ',0.1]' +
+                ' -a [' + ffa  + ',0.1]' +
+                ' -x ' + fgm_mask +
+                ' -i PriorProbabilityImages[2, ' + atropos_gm_base + '%02d' + fsl_ext() + ',0.1,0.0001]' +
+                ' -m [0.3, 2x2x2] ' +
+                ' -o ' + atropos_gm_label +
+                ' -k HistogramParzenWindows[1.0,32]' +
+                ' -v')
+    else:
+        print("GM segmentation already completed")
+    gm_label = nib.load(atropos_gm_label).get_data()
+    cerebellar_gm = gm_label ==2
+    
+    # Segment CSF into ventricles / exterior csf 
+    atropos_csf_base = surfDir + thisSub + suffix + 'CSF_'
+    atropos_csf_label = atropos_csf_base + 'label' + fsl_ext()
+
+    atropos_csf_prob = atropos_csf_base + '01' + fsl_ext()
+    nib.save(nib.Nifti1Image(csf_prob, dwi_img.affine), atropos_csf_prob)
+    
+    atropos_vent_prob = atropos_csf_base + '02' + fsl_ext()
+    nib.save(nib.Nifti1Image(vent_prob, dwi_img.affine), atropos_vent_prob)
+    
+    if not os.path.exists(atropos_csf_label):
+        system('Atropos -d 3' +
+                ' -a [' + fdwi + ',0.1]'+
+                ' -a [' + ffa  + ',0.1]'+
+                ' -x ' + fcsf_mask +
+                ' -i PriorProbabilityImages[2, ' + atropos_csf_base + '%02d' + fsl_ext() + ',0.1,0.0001]' +
+                ' -m [0.3, 2x2x2] ' +
+                ' -o ' + atropos_csf_label +
+                ' -k HistogramParzenWindows[1.0,32]' +
+                ' -v ')
+    else:
+        print("CSF segmentation already completed")
+    csf_label = nib.load(atropos_csf_label).get_data()
+    ventricles = csf_label == 2
+
+
+    # Segment WM into Cerebellum WM / Brain Stem WM / Cerebrum WM
+    atropos_wm_base = surfDir + thisSub + suffix + 'WM_'
+    atropos_wm_label = atropos_wm_base + 'label' + fsl_ext()
+
+    atropos_wm_prob = atropos_wm_base + '01' + fsl_ext()
+    nib.save(nib.Nifti1Image(wm_prob, dwi_img.affine), atropos_wm_prob)
+
+    atropos_brain_stem_prob = atropos_wm_base + '02' + fsl_ext()
+    nib.save(nib.Nifti1Image(brain_stem_prob, dwi_img.affine), atropos_brain_stem_prob)
+
+    atropos_cerebellum_prob = atropos_wm_base + '03' + fsl_ext()
+    nib.save(nib.Nifti1Image(cerebellum_prob, dwi_img.affine), atropos_cerebellum_prob)
+
+    if not os.path.exists(atropos_wm_label):
+        system('Atropos -d 3' +
+                ' -a [' + fdwi + ',0.1]' +
+                ' -a [' + ffa  + ',0.1]'+
+                ' -x ' + fwm_mask +
+                ' -i PriorProbabilityImages[3, ' + atropos_wm_base + '%02d' + fsl_ext() + ',0.1,0.0001]' +
+                ' -m [0.3, 2x2x2] ' +
+                ' -o ' + atropos_wm_label +
+                ' -k HistogramParzenWindows[1.0,32]' + 
+                ' -v')
+    else:
+        print("WM segmentation already completed")
+    wm_label = nib.load(atropos_wm_label).get_data()
+    brain_stem = wm_label == 2
+    cerebellar_wm = wm_label == 3
+
+    pseudo_white[cerebellar_gm] = 0
+    pseudo_white[cerebellar_wm] = 0
+    pseudo_white[ventricles] = 1
+    pseudo_white[brain_stem] = 0
+
     # Resample segmentations to 0.75 mm isotropic
     old_vsize = seg_img.header.get_zooms()[:3]
     new_vsize = (0.75, 0.75, 0.75)
     seg_data, new_affine = reslice(seg_data, seg_img.affine, old_vsize, new_vsize, order=0)
-
-    pseudo_white_ind = [2,5,6,7,8,11]
-    pseudo_white = np.zeros(seg_data.shape)
-    pseudo_white[np.isin(seg_data, pseudo_white_ind)] = 1
+    pseudo_white, new_affine = reslice(pseudo_white, seg_img.affine, old_vsize, new_vsize, order=0)
+    internal_mask, new_affine = reslice(internal_mask, seg_img.affine, old_vsize, new_vsize, order=0)
+    external_mask, new_affine = reslice(external_mask, seg_img.affine, old_vsize, new_vsize, order=0)
+    thalamus_label, new_affine = reslice(thalamus_label, seg_img.affine, old_vsize, new_vsize, order=0)
+    brain_stem, new_affine = reslice(brain_stem, seg_img.affine, old_vsize, new_vsize, order=0)
+    ventricles, new_affine = reslice(ventricles, seg_img.affine, old_vsize, new_vsize, order=0)
+    cerebellar_gm, new_affine = reslice(cerebellar_gm, seg_img.affine, old_vsize, new_vsize, order=0)
+    cerebellar_wm, new_affine = reslice(cerebellar_wm, seg_img.affine, old_vsize, new_vsize, order=0)
+    dwi_data_reslice, new_affine = reslice(dwi_img.get_data(), dwi_img.affine, old_vsize, new_vsize, order=3)
     
+    fdwi_resamp = surfDir + thisSub + suffix + 'DWI_resamp' + fsl_ext()
+    nib.save(nib.Nifti1Image(dwi_data_reslice, new_affine), fdwi_resamp)
+    fdwi_neg = surfDir + thisSub + suffix + 'DWI_neg' + fsl_ext()
+    nib.save(nib.Nifti1Image(-1 * dwi_data_reslice, new_affine), fdwi_neg)
+
+
     # Segmentation is not perfect at the moment, remove any pieces of the pseudo wm mask on islands 
     label_im, nb_labels = ndimage.label(pseudo_white == 1)
     sizes = ndimage.sum(pseudo_white == 1, label_im, range(nb_labels + 1))
@@ -165,14 +350,12 @@ def generate_initial_lr_wm(subDir, thisSub, suffix, surfDir):
     pseudo_white[binary_closing(pseudo_white, iterations = 3)] = 1
     pseudo_white[binary_fill_holes(pseudo_white)] = 1
 
-    thalamus_label = np.zeros(seg_data.shape)
-    thalamus_label[seg_data == 5] = 1
-    thalamus_center = np.uint8(np.round(center_of_mass(thalamus_label)))
-
     fpseudo_white = surfDir + thisSub + suffix + '_initwm' + fsl_ext()
     nib.save(nib.Nifti1Image(np.int8(pseudo_white), new_affine), fpseudo_white)
 
     # Separate into left and right hemispheres based on the center of mass of the thalamus
+    thalamus_center = np.uint8(np.round(center_of_mass(thalamus_label)))
+
     lh_pseudo_white = np.zeros(pseudo_white.shape)
     lh_pseudo_white[thalamus_center[0]+1:,:,:] = pseudo_white[thalamus_center[0]+1:,:,:]
     
@@ -194,9 +377,10 @@ def generate_initial_lr_wm(subDir, thisSub, suffix, surfDir):
     # fill 2 voxels left/right of intersect for inter hemispheric mask
     inter_mask[np.logical_or(np.roll(wm_intersect, -1, axis=0)==1, np.roll(wm_intersect, 1, axis=0)==1)] = 0
     inter_mask[np.logical_or(np.roll(wm_intersect, -2, axis=0)==1, np.roll(wm_intersect, 2, axis=0)==1)] = 0
-    inter_mask[seg_data == 11] = 0
-    inter_mask[seg_data == 5] = 0
-    inter_mask[seg_data == 10] = 0
+    inter_mask[external_mask == 1] = 0
+    inter_mask[brain_stem] = 0
+    inter_mask[thalamus_label == 1] = 0
+    inter_mask[ventricles] = 0
 
     # Segmentation is not perfect at the moment, remove any pieces of the interhempispheric mask on islands 
     label_im, nb_labels = ndimage.label(inter_mask == 0)
@@ -215,24 +399,62 @@ def generate_initial_lr_wm(subDir, thisSub, suffix, surfDir):
     finter = surfDir + thisSub + suffix + '_inter_mask' + fsl_ext()
     nib.save(nib.Nifti1Image(np.int8(inter_mask), new_affine), finter)
 
-    # Estimate boundary FA
-    fwm_edge = fpseudo_white.replace(fsl_ext(),'_edge' + fsl_ext())
-    os.system('fslmaths ' + fpseudo_white + ' -edge -bin -mas ' + fpseudo_white + ' ' + fwm_edge)
+    # Output distance maps for surface based cortical segmentation
+    tissueDir = subDir + 'tissue_classification/'
+    fwm_prob = tissueDir + 'tissue_prob_final_out_prob_WM' + fsl_ext()
+    wm_prob_img = nib.load(fwm_prob)
+    wm_prob = wm_prob_img.get_data()
+    fgm_prob = tissueDir + 'tissue_prob_final_out_prob_GM' + fsl_ext()
+    gm_prob = nib.load(fgm_prob).get_data()
+    fcsf_prob = tissueDir + 'tissue_prob_final_out_prob_CSF' + fsl_ext()
+    csf_prob = nib.load(fcsf_prob).get_data()
 
-    edge_img = nib.load(fwm_edge)
-    edge_data = edge_img.get_data()
+    # Resample tissue probability maps
+    wm_prob, new_affine = reslice(wm_prob, seg_img.affine, old_vsize, new_vsize, order=3)
+    gm_prob, new_affine = reslice(gm_prob, seg_img.affine, old_vsize, new_vsize, order=3)
+    csf_prob, new_affine = reslice(csf_prob, seg_img.affine, old_vsize, new_vsize, order=3)
 
-    ffa = subDir + 'DTI_maps/' + thisSub + suffix + '_FA' + fsl_ext()
-    fa_img = nib.load(ffa)
-    fa_data = fa_img.get_data()
-    new_vsize = (0.75, 0.75, 0.75)
-    fa_data, new_affine = reslice(fa_data, fa_img.affine, fa_img.header.get_zooms()[:3], new_vsize, order=1)
-    fa_target = np.percentile(fa_data[edge_data == 1],20)
+    # WM/cortex distance map
+    wm_dist = -1 * wm_prob
+    wm_dist = wm_dist + gm_prob
+    wm_dist = wm_dist + csf_prob
+    wm_dist[binary_dilation(binary_dilation(internal_mask == 1))] = -1
+    wm_dist[binary_dilation(binary_dilation(ventricles))] = -1
+    wm_dist[binary_dilation(binary_dilation(brain_stem))] = 1
 
-    #plt.hist(fa_data[edge_data == 1], bins = 200)
-    #plt.show()
+    fwm_dist = surfDir + thisSub + suffix + '_wm_cortex_dist' + fsl_ext()
+    nib.save(nib.Nifti1Image(wm_dist, new_affine), fwm_dist)
+    
+    # cortex/CSF distance map
+    cortex_dist = np.zeros(seg_data.shape)
+    cortex_dist[seg_data == 2] = -1
+    cortex_dist[seg_data == 1] = -1
+    cortex_dist[seg_data == 3] = 1
+    cortex_dist[binary_dilation(binary_dilation(internal_mask == 1))] = -1
+    cortex_dist[binary_dilation(binary_dilation(ventricles))] = -1
+    cortex_dist[binary_dilation(binary_dilation(brain_stem))] = 1
+    cortex_dist[cerebellar_gm] = 1
+    cortex_dist[cerebellar_wm] = 1
+    cortex_dist[binary_dilation(binary_dilation(external_mask == 1))] = 1
 
-    return fwm_lh, fwm_rh, finter, fa_target
+    fcortex_dist = surfDir + thisSub + suffix + '_cortex_csf_dist' + fsl_ext()
+    nib.save(nib.Nifti1Image(cortex_dist, new_affine), fcortex_dist)
+    
+    ## Estimate boundary FA
+    #fwm_edge = fpseudo_white.replace(fsl_ext(),'_edge' + fsl_ext())
+    #os.system('fslmaths ' + fpseudo_white + ' -edge -bin -mas ' + fpseudo_white + ' ' + fwm_edge)
+
+    #edge_img = nib.load(fwm_edge)
+    #edge_data = edge_img.get_data()
+
+    #ffa = subDir + 'DTI_maps/' + thisSub + suffix + '_FA' + fsl_ext()
+    #fa_img = nib.load(ffa)
+    #fa_data = fa_img.get_data()
+    #new_vsize = (0.75, 0.75, 0.75)
+    #fa_data, new_affine = reslice(fa_data, fa_img.affine, fa_img.header.get_zooms()[:3], new_vsize, order=1)
+    #fa_target = np.percentile(fa_data[edge_data == 1],20)
+
+    return fwm_lh, fwm_rh, finter, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg
 
 def generate_tensor_force_map(subDir, thisSub, preproc_suffix, suffix, surfDir, fa_target=0.2):
 
@@ -345,8 +567,38 @@ def generate_surfaces_from_dwi(outDir, thisSub, preproc_suffix, shell_suffix, fr
 
     wm_surf_fname = surfDir + thisSub + suffix + '_wm.vtk'
     
-    wm_lh_fname, wm_rh_fname, finter, fa_target = generate_initial_lr_wm(subDir, thisSub, suffix, surfDir)
-    ftb_force, fdwi_mask, fdwi_neg, fWMGM_bound, fGMCSF_bound, fCSF_bound = generate_tensor_force_map(subDir, thisSub, preproc_suffix, suffix, surfDir, fa_target = fa_target)
+    wm_lh_fname, wm_rh_fname, finter, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg = generate_initial_lr_wm(subDir, thisSub, suffix, surfDir)
+    #ftb_force, fdwi_mask, fdwi_neg, fWMGM_bound, fGMCSF_bound, fCSF_bound = generate_tensor_force_map(subDir, thisSub, preproc_suffix, suffix, surfDir, fa_target = fa_target)
+
+    # Output Composite MD map
+    #dtiDir = subDir + 'DTI_maps/'
+    #fmd = dtiDir + thisSub + suffix + '_MD' + fsl_ext()
+    #md_img = nib.load(fmd)
+    #md_data = md_img.get_data()
+
+    #ffa = dtiDir + thisSub + suffix + '_FA' + fsl_ext()
+    #fa_data = nib.load(ffa).get_data()
+
+    #md_plus_fa = md_data*1000 + fa_data
+    #md_plus_fa_neg = -1 * md_plus_fa
+
+    #fmd_plus_fa = surfDir + thisSub + suffix + '_MDplusFA' + fsl_ext()
+    #nib.save(nib.Nifti1Image(md_plus_fa, md_img.affine), fmd_plus_fa)
+
+    #fmd_plus_fa_neg = surfDir + thisSub + suffix + '_MDplusFA_neg' + fsl_ext()
+    #nib.save(nib.Nifti1Image(md_plus_fa_neg, md_img.affine), fmd_plus_fa_neg)
+
+    #tissueDir = subDir + 'tissue_classification/'
+    #fwm_prob = tissueDir + 'tissue_prob_final_out_prob_WM' + fsl_ext()
+    #wm_prob_img = nib.load(fwm_prob)
+    #wm_dist = -1 * wm_prob_img.get_data()
+    #fgm_prob = tissueDir + 'tissue_prob_final_out_prob_GM' + fsl_ext()
+    #wm_dist = wm_dist + nib.load(fgm_prob).get_data()
+    #fcsf_prob = tissueDir + 'tissue_prob_final_out_prob_CSF' + fsl_ext()
+    #wm_dist = wm_dist + nib.load(fcsf_prob).get_data()
+
+    #fwm_dist = fwm_prob.replace(fsl_ext(), '_dist' + fsl_ext())
+    #nib.save(nib.Nifti1Image(wm_dist, wm_prob_img.affine), fwm_dist)
 
     if not os.path.exists(wm_surf_fname):
 
@@ -450,38 +702,42 @@ def generate_surfaces_from_dwi(outDir, thisSub, preproc_suffix, shell_suffix, fr
         os.system('mirtk erode-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a InitialStatus -n 6 ')
 
     # Refine WM Surface
-    wm_surf_refined_fname = wm_surf_fname.replace('.vtk', '_WithTBforce.vtk')
-    print("Generating WM Surface with tensor-based force: FA Target " + str(fa_target))
-    if not os.path.exists(wm_surf_refined_fname):
+    #wm_surf_refined_fname = wm_surf_fname.replace('.vtk', '_WithTBforce.vtk')
+    #print("Generating WM Surface with tensor-based force: FA Target " + str(fa_target))
+    wm_final_fname = wm_surf_fname.replace('.vtk','_final.vtk')
+    if not os.path.exists(wm_final_fname):
         # With Tensor-based force
-        os.system('mirtk deform-mesh ' + wm_surf_fname + ' ' + wm_surf_refined_fname + ' -image ' + fdwi_mask + ' -edge-distance 1.6 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -distance-image ' + ftb_force + ' -distance 1.6 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -threads 32 -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0')
+        #os.system('mirtk deform-mesh ' + wm_surf_fname + ' ' + wm_surf_refined_fname + ' -image ' + fdwi_mask + ' -edge-distance 1.6 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -distance-image ' + ftb_force + ' -distance 1.6 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -threads 32 -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0')
         
-    ## without tensor-based force
-    #os.system('mirtk deform-mesh ' + wm_surf_fname + ' ' + wm_surf_refined_fname.replace('.vtk','_noTensor.vtk') + ' -image ' + fdwi_mask + ' -edge-distance 1.6 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -optimizer EulerMethod -step 0.2 -steps 100 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum')
+        ## without tensor-based force
+        #os.system('mirtk deform-mesh ' + wm_surf_fname + ' ' + wm_surf_refined_fname.replace('.vtk','_noTensor.vtk') + ' -image ' + fwm_prob_neg + ' -edge-distance 2.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -optimizer EulerMethod -step 0.4 -steps 100 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -threads 8')
+        
+        os.system('mirtk deform-mesh ' + wm_surf_fname + ' ' + wm_final_fname + ' -distance-image ' + fwm_dist +' -distance 1.6 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -threads 8')
     else:
         print("white surface already refined")
 
 
-    print("Refining White Surface without distance force")
-    wm_final_fname = wm_surf_fname.replace('.vtk','_final.vtk')
-    if not os.path.exists(wm_final_fname):
-        os.system('mirtk deform-mesh ' + wm_surf_refined_fname + ' ' + wm_final_fname + ' -image ' + fdwi_mask + ' -edge-distance 1.6 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -distance-image ' + fCSF_bound + ' -distance 1.6 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 1.0 -repulsion-width 2.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -threads 32 -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0')
+    #print("Refining White Surface without distance force")
+    #wm_final_fname = wm_surf_fname.replace('.vtk','_final.vtk')
+    #if not os.path.exists(wm_final_fname):
+    #    #os.system('mirtk deform-mesh ' + wm_surf_refined_fname + ' ' + wm_final_fname + ' -image ' + fdwi_mask + ' -edge-distance 1.6 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -distance-image ' + fCSF_bound + ' -distance 1.6 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 1.0 -repulsion-width 2.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -threads 32 -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0')
 
     
-    # Move surface outward edge based on CSF segmentation
+    ## Move surface outward edge based on CSF segmentation
     print("Expanding white surface Using GM/CSF Boundary")
     wm_expand_fname = wm_final_fname.replace('.vtk','_expandGMCSF.vtk')
     if not os.path.exists(wm_expand_fname):
         #os.system('mirtk deform-mesh ' + wm_final_fname + ' ' + wm_expand_fname + ' -normal 0.25 -step 0.1 -optimizer EulerMethod -steps 500 -max-displacement 1.5 -non-self-intersection True -nointersection -fast-collision-test -min-active 5% -delta 0.0001 -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 8 -gauss-curvature 0.8 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate  -threads 16')
-        os.system('mirtk deform-mesh ' + wm_final_fname + ' ' + wm_expand_fname + ' -image ' + fdwi_neg + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -distance-image ' + fGMCSF_bound + ' -distance 1.6 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate  -threads 32')
+        os.system('mirtk deform-mesh ' + wm_final_fname + ' ' + wm_expand_fname + ' -image ' + fdwi_neg + ' -edge-distance 0.5 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -distance-image ' + fcortex_dist + ' -distance 1.0 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate  -threads 8')
     else:
         print("Expanded surface already generated")
 
-    # Generate pial surface
+    ## Generate pial surface
     print("Refining CSF/GREY border")
     pial_fname =  surfDir + thisSub + suffix + '_pial.vtk'
     if not os.path.exists(pial_fname):
         os.system('mirtk deform-mesh ' + wm_expand_fname + ' ' + pial_fname + ' -image ' + fdwi_neg + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate  -threads 32')
+        #os.system('mirtk deform-mesh ' + wm_final_fname + ' ' + pial_fname + ' -distance-image ' + fcortex_dist +' -distance 1.0 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate -threads 8')
     else:
         print("pial remesh already made")
 

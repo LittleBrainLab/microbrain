@@ -29,7 +29,6 @@ def fsl_ext():
     return fsl_extension
 
 def extract_FA_MD_from_subcortical_segmentations(subID, segDir, ffa, fmd):
-
     md_img = nib.load(fmd)
     md_data = md_img.get_data()
 
@@ -94,18 +93,18 @@ def main(argv):
     sublist_md_std = np.zeros((len(subList),8))
     sub_ind = 0
 
-    print(subList)
-    print('Here!')
+    subID_list = []
     for subDir in subList:
         # Get FA, MD and subcortical GM segmentation directory
         baseDir, subID = os.path.split(os.path.normpath(subDir))
+        subID_list += [subID]
         print('Extracting Subject: ' + subID)
 
         dtiDir = baseDir + '/' + subID + '/DTI_maps/' 
         for file in os.listdir(dtiDir):
-            if file.endswith('FA' + fsl_ext()):
+            if file.endswith('_FA' + fsl_ext()):
                 ffa = dtiDir + file
-            elif file.endswith('MD' + fsl_ext()):
+            elif file.endswith('_MD' + fsl_ext()):
                 fmd = dtiDir + file
 
         segDir = baseDir + '/' + subID + '/subcortical_segmentation/'
@@ -115,17 +114,19 @@ def main(argv):
         sublist_fa[sub_ind,:] = FA
         sublist_fa_std[sub_ind,:] = FAstd
         sublist_md[sub_ind,:] = MD
-        sublist_md[sub_ind,:] = MDstd
+        sublist_md_std[sub_ind,:] = MDstd
         sub_ind = sub_ind + 1
 
-    subcort_label_str = ''
-    for label in subcort_label:
-        subcort_label_str = subcort_label_str + label + ' '
-
-    np.savetxt('seg_fa_mean.txt',sublist_fa, header=subcort_label_str)
-    np.savetxt('seg_fa_std.txt',sublist_fa_std, header=subcort_label_str)
-    np.savetxt('seg_md_mean.txt',sublist_md, header=subcort_label_str)
-    np.savetxt('seg_md_std.txt',sublist_md_std, header=subcort_label_str)
+    subList_labels = np.array(subID_list, dtype='|S40')[:,np.newaxis]
+    subcort_label = [''] + subcort_label
+    subcort_label = str(subcort_label).replace("'","").replace('[','').replace(']','')
+    
+    print(subcort_label) 
+    
+    np.savetxt(outfile + '_fa_mean.csv',np.hstack((subList_labels,sublist_fa.astype(np.str_))),delimiter=',', fmt='%s', header=subcort_label)
+    np.savetxt(outfile + '_fa_std.csv',np.hstack((subList_labels,sublist_fa_std.astype(np.str_))),delimiter=',', fmt='%s', header=subcort_label)
+    np.savetxt(outfile + '_md_mean.csv',np.hstack((subList_labels,sublist_md.astype(np.str_))),delimiter=',', fmt='%s', header=subcort_label)
+    np.savetxt(outfile + '_md_std.txt',np.hstack((subList_labels,sublist_md_std.astype(np.str_))),delimiter=',', fmt='%s', header=subcort_label)
 
 if __name__ == "__main__":
    main(sys.argv[1:])
