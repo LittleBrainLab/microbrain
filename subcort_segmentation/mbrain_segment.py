@@ -84,163 +84,250 @@ def vertex_PCA(A):
 
     return values, vectors, proj_A
 
-def register_prob_maps(fref, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir):
+## Old method used FSL flirt
+#def register_prob_maps_flirt(fref, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir):
+#    
+#    if not os.path.exists(regDir):
+#            os.system('mkdir ' + regDir)
+#
+#    ftempbasename = os.path.basename(ftemplate)
+#    ftemplate_out = regDir + ftempbasename.replace('.nii.gz','_flirt_native' + fsl_ext())
+#   
+#    fgm_basename =  os.path.basename(fgm)
+#    fgm_out = regDir + fgm_basename.replace('.nii','_flirt_native' + fsl_ext())
+#
+#    fwm_basename =  os.path.basename(fwm)
+#    fwm_out = regDir + fwm_basename.replace('.nii','_flirt_native' + fsl_ext())
+#
+#    fcsf_basename =  os.path.basename(fcsf)
+#    fcsf_out = regDir + fcsf_basename.replace('.nii','_flirt_native' + fsl_ext())
+#
+#    fmni_basename =  os.path.basename(fmni)
+#    fmni_out = regDir + fmni_basename.replace('.nii.gz','_flirt_native' + fsl_ext())
+#
+#    fharvard_basename =  os.path.basename(fharvard)
+#    fharvard_out = regDir + fharvard_basename.replace('.nii.gz','_flirt_native' + fsl_ext())
+#        
+#    if not os.path.exists(ftemplate_out):
+#        print('Running FLIRT')
+#        
+#        # Make template mask
+#        ftemplate_mask = regDir + ftempbasename.replace('.nii.gz','_mask' + fsl_ext())
+#        system('fslmaths ' + ftemplate + ' -bin ' + ftemplate_mask)
+#        
+#        fmat = regDir + 'flirt_mni2native.txt'
+#        system('flirt -ref ' + fref + 
+#                ' -in ' + ftemplate +
+#                ' -inweight ' + ftemplate_mask +
+#                ' -refweight ' + fmask +
+#                ' -omat ' + fmat + 
+#                ' -out ' + ftemplate_out +
+#                ' -setbackground 0')
+#
+#        print('Applying Linear Transformation to probabilistic atlases')
+#        system('flirt -init ' + fmat +
+#                ' -ref ' + fref +
+#                ' -in ' + fgm +
+#                ' -o ' + fgm_out +
+#                ' -applyxfm')
+#        
+#        system('flirt -init ' + fmat +
+#                ' -ref ' + fref +
+#                ' -in ' + fwm +
+#                ' -o ' + fwm_out +
+#                ' -applyxfm')
+#        
+#        system('flirt -init ' + fmat +
+#                ' -ref ' + fref + 
+#                ' -in ' + fcsf +
+#                ' -o ' + fcsf_out +
+#                ' -applyxfm')
+#
+#        system('flirt -init ' + fmat +
+#                ' -ref ' + fref +  
+#                ' -in ' + fmni +
+#                ' -o ' + fmni_out +
+#                ' -applyxfm')
+#
+#        system('flirt -init ' + fmat +
+#                ' -ref ' + fref +  
+#                ' -in ' + fharvard +
+#                ' -o ' + fharvard_out +
+#                ' -applyxfm')
+#    else:
+#        print("Linear registeration of atlases already performed")
+#
+#    return fgm_out, fwm_out, fcsf_out, fmni_out, fharvard_out
+
+##Old method using FSL fnirt
+#def nonlinear_register_prob_maps(fref, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir):
+#    
+#    if not os.path.exists(regDir):
+#            os.system('mkdir ' + regDir)
+#
+#    ftempbasename = os.path.basename(ftemplate)
+#    ftemplate_out = regDir + ftempbasename.replace('.nii.gz','_flirt_native' + fsl_ext())
+#   
+#    fgm_basename =  os.path.basename(fgm)
+#    fgm_out = regDir + fgm_basename.replace('.nii','_flirt_native' + fsl_ext())
+#
+#    fwm_basename =  os.path.basename(fwm)
+#    fwm_out = regDir + fwm_basename.replace('.nii','_flirt_native' + fsl_ext())
+#
+#    fcsf_basename =  os.path.basename(fcsf)
+#    fcsf_out = regDir + fcsf_basename.replace('.nii','_flirt_native' + fsl_ext())
+#
+#    fmni_basename =  os.path.basename(fmni)
+#    fmni_out = regDir + fmni_basename.replace('.nii.gz','_flirt_native' + fsl_ext())
+#
+#    fharvard_basename =  os.path.basename(fharvard)
+#    fharvard_out = regDir + fharvard_basename.replace('.nii.gz','_flirt_native' + fsl_ext())
+#        
+#    if not os.path.exists(ftemplate_out):
+#        print('Running FLIRT')
+#        
+#        # Make template mask
+#        ftemplate_mask = regDir + ftempbasename.replace('.nii.gz','_mask' + fsl_ext())
+#        system('fslmaths ' + ftemplate + ' -bin ' + ftemplate_mask)
+#        
+#        fmat = regDir + 'flirt_mni2native.txt'
+#        system('flirt -ref ' + ftemplate + 
+#                ' -in ' + fref +
+#                ' -inweight ' + fmask +
+#                ' -refweight ' + ftemplate_mask +
+#                ' -omat ' + fmat + 
+#                ' -out ' + ftemplate_out +
+#                ' -setbackground 0')
+#
+#        #non-linear registration
+#        fwarp = regDir + 'fnirt_warp' + fsl_ext()
+#        print('Running FNIRT')
+#        system('fnirt --in=' + fref +
+#               ' --ref=' + ftemplate + 
+#               ' --aff=' + fmat + 
+#               ' --cout=' + fwarp + 
+#               ' --config=FA_2_FMRIB58_1mm')
+#
+#        #Invert warp
+#        finvwarp = regDir + 'fnirt_invwarp' + fsl_ext()
+#        print('Calculating Inverse Warp')
+#        system('invwarp --ref=' + fref +
+#               ' --warp=' + fwarp +
+#               ' --out=' + finvwarp)
+#
+#        print('Applying Non-Linear Transformation to probabilistic atlases')
+#        system('applywarp --in=' + fgm +
+#               ' --ref=' + fref +
+#               ' --warp=' + finvwarp + 
+#               ' --out=' + fgm_out)
+#       
+#        system('applywarp --in=' + fwm +
+#               ' --ref=' + fref +
+#               ' --warp=' + finvwarp +
+#               ' --out=' + fwm_out)
+#
+#        system('applywarp --in=' + fcsf +
+#               ' --ref=' + fref +
+#               ' --warp=' + finvwarp +
+#               ' --out=' + fcsf_out)
+#
+#        system('applywarp --in=' + fmni +
+#               ' --ref=' + fref +
+#               ' --warp=' + finvwarp +
+#               ' --out=' + fmni_out)
+#
+#        system('applywarp --in=' + fharvard +
+#               ' --ref=' + fref +
+#               ' --warp=' + finvwarp +
+#               ' --out=' + fharvard_out)
+#    else:
+#        print("Linear registeration of atlases already performed")
+#
+#    return fgm_out, fwm_out, fcsf_out, fmni_out, fharvard_out
+
+
+
+# New registration uses ants (much faster and potentially better but registration is an art not a science)
+def register_prob_maps_ants(fsource, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir):
     
     if not os.path.exists(regDir):
             os.system('mkdir ' + regDir)
 
+    method_suffix = '_ANTsReg_native'
     ftempbasename = os.path.basename(ftemplate)
-    ftemplate_out = regDir + ftempbasename.replace('.nii.gz','_flirt_native' + fsl_ext())
+    ftemplate_out = regDir + ftempbasename.replace('.nii.gz', method_suffix + fsl_ext())
    
     fgm_basename =  os.path.basename(fgm)
-    fgm_out = regDir + fgm_basename.replace('.nii','_flirt_native' + fsl_ext())
+    fgm_out = regDir + fgm_basename.replace('.nii',method_suffix + fsl_ext())
 
     fwm_basename =  os.path.basename(fwm)
-    fwm_out = regDir + fwm_basename.replace('.nii','_flirt_native' + fsl_ext())
+    fwm_out = regDir + fwm_basename.replace('.nii',method_suffix + fsl_ext())
 
     fcsf_basename =  os.path.basename(fcsf)
-    fcsf_out = regDir + fcsf_basename.replace('.nii','_flirt_native' + fsl_ext())
+    fcsf_out = regDir + fcsf_basename.replace('.nii',method_suffix + fsl_ext())
 
     fmni_basename =  os.path.basename(fmni)
-    fmni_out = regDir + fmni_basename.replace('.nii.gz','_flirt_native' + fsl_ext())
+    fmni_out = regDir + fmni_basename.replace('.nii.gz',method_suffix + fsl_ext())
 
     fharvard_basename =  os.path.basename(fharvard)
-    fharvard_out = regDir + fharvard_basename.replace('.nii.gz','_flirt_native' + fsl_ext())
-        
-    if not os.path.exists(ftemplate_out):
-        print('Running FLIRT')
+    fharvard_out = regDir + fharvard_basename.replace('.nii.gz',method_suffix + fsl_ext())
+    
+    ftransform_out = regDir + 'ants_native2mni_'
+    if not os.path.exists(fharvard_out):
+        print('Running Ants Registration')
         
         # Make template mask
         ftemplate_mask = regDir + ftempbasename.replace('.nii.gz','_mask' + fsl_ext())
         system('fslmaths ' + ftemplate + ' -bin ' + ftemplate_mask)
         
-        fmat = regDir + 'flirt_mni2native.txt'
-        system('flirt -ref ' + fref + 
-                ' -in ' + ftemplate +
-                ' -inweight ' + ftemplate_mask +
-                ' -refweight ' + fmask +
-                ' -omat ' + fmat + 
-                ' -out ' + ftemplate_out +
-                ' -setbackground 0')
+        system('antsRegistrationSyNQuick.sh' +
+                ' -d 3' +
+                ' -f ' + ftemplate + 
+                ' -m ' + fsource +
+                ' -o ' + ftransform_out +
+                ' -x ' + ftemplate_mask)
 
-        print('Applying Linear Transformation to probabilistic atlases')
-        system('flirt -init ' + fmat +
-                ' -ref ' + fref +
-                ' -in ' + fgm +
-                ' -o ' + fgm_out +
-                ' -applyxfm')
         
-        system('flirt -init ' + fmat +
-                ' -ref ' + fref +
-                ' -in ' + fwm +
-                ' -o ' + fwm_out +
-                ' -applyxfm')
+        print('Warping probabilistic atlases to native space')
         
-        system('flirt -init ' + fmat +
-                ' -ref ' + fref + 
-                ' -in ' + fcsf +
-                ' -o ' + fcsf_out +
-                ' -applyxfm')
+        system('antsApplyTransforms' +
+               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
+               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
+               ' -r ' + fsource +
+               ' -i ' + fgm + 
+               ' -o ' + fgm_out)
 
-        system('flirt -init ' + fmat +
-                ' -ref ' + fref +  
-                ' -in ' + fmni +
-                ' -o ' + fmni_out +
-                ' -applyxfm')
+        system('antsApplyTransforms' +
+               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
+               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
+               ' -r ' + fsource +  
+               ' -i ' + fwm + 
+               ' -o ' + fwm_out)
 
-        system('flirt -init ' + fmat +
-                ' -ref ' + fref +  
-                ' -in ' + fharvard +
-                ' -o ' + fharvard_out +
-                ' -applyxfm')
+        system('antsApplyTransforms' +
+               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
+               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
+               ' -r ' + fsource +  
+               ' -i ' + fcsf + 
+               ' -o ' + fcsf_out)
+        
+        system('antsApplyTransforms' +
+               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
+               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
+               ' -r ' + fsource +
+               ' -e 3 ' + 
+               ' -i ' + fmni +
+               ' -o ' + fmni_out)
+
+        system('antsApplyTransforms' +
+                ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
+                ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
+                ' -r ' + fsource +
+                ' -e 3 ' +
+                ' -i ' + fharvard +
+                ' -o ' + fharvard_out)
     else:
-        print("Linear registeration of atlases already performed")
-
-    return fgm_out, fwm_out, fcsf_out, fmni_out, fharvard_out
-
-
-def nonlinear_register_prob_maps(fref, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir):
-    
-    if not os.path.exists(regDir):
-            os.system('mkdir ' + regDir)
-
-    ftempbasename = os.path.basename(ftemplate)
-    ftemplate_out = regDir + ftempbasename.replace('.nii.gz','_flirt_native' + fsl_ext())
-   
-    fgm_basename =  os.path.basename(fgm)
-    fgm_out = regDir + fgm_basename.replace('.nii','_flirt_native' + fsl_ext())
-
-    fwm_basename =  os.path.basename(fwm)
-    fwm_out = regDir + fwm_basename.replace('.nii','_flirt_native' + fsl_ext())
-
-    fcsf_basename =  os.path.basename(fcsf)
-    fcsf_out = regDir + fcsf_basename.replace('.nii','_flirt_native' + fsl_ext())
-
-    fmni_basename =  os.path.basename(fmni)
-    fmni_out = regDir + fmni_basename.replace('.nii.gz','_flirt_native' + fsl_ext())
-
-    fharvard_basename =  os.path.basename(fharvard)
-    fharvard_out = regDir + fharvard_basename.replace('.nii.gz','_flirt_native' + fsl_ext())
-        
-    if not os.path.exists(ftemplate_out):
-        print('Running FLIRT')
-        
-        # Make template mask
-        ftemplate_mask = regDir + ftempbasename.replace('.nii.gz','_mask' + fsl_ext())
-        system('fslmaths ' + ftemplate + ' -bin ' + ftemplate_mask)
-        
-        fmat = regDir + 'flirt_mni2native.txt'
-        system('flirt -ref ' + ftemplate + 
-                ' -in ' + fref +
-                ' -inweight ' + fmask +
-                ' -refweight ' + ftemplate_mask +
-                ' -omat ' + fmat + 
-                ' -out ' + ftemplate_out +
-                ' -setbackground 0')
-
-        #non-linear registration
-        fwarp = regDir + 'fnirt_warp' + fsl_ext()
-        print('Running FNIRT')
-        system('fnirt --in=' + fref +
-               ' --ref=' + ftemplate + 
-               ' --aff=' + fmat + 
-               ' --cout=' + fwarp + 
-               ' --config=FA_2_FMRIB58_1mm')
-
-        #Invert warp
-        finvwarp = regDir + 'fnirt_invwarp' + fsl_ext()
-        print('Calculating Inverse Warp')
-        system('invwarp --ref=' + fref +
-               ' --warp=' + fwarp +
-               ' --out=' + finvwarp)
-
-        print('Applying Non-Linear Transformation to probabilistic atlases')
-        system('applywarp --in=' + fgm +
-               ' --ref=' + fref +
-               ' --warp=' + finvwarp + 
-               ' --out=' + fgm_out)
-       
-        system('applywarp --in=' + fwm +
-               ' --ref=' + fref +
-               ' --warp=' + finvwarp +
-               ' --out=' + fwm_out)
-
-        system('applywarp --in=' + fcsf +
-               ' --ref=' + fref +
-               ' --warp=' + finvwarp +
-               ' --out=' + fcsf_out)
-
-        system('applywarp --in=' + fmni +
-               ' --ref=' + fref +
-               ' --warp=' + finvwarp +
-               ' --out=' + fmni_out)
-
-        system('applywarp --in=' + fharvard +
-               ' --ref=' + fref +
-               ' --warp=' + finvwarp +
-               ' --out=' + fharvard_out)
-    else:
-        print("Linear registeration of atlases already performed")
+        print("ANTs nonlinear registeration of atlases already performed")
 
     return fgm_out, fwm_out, fcsf_out, fmni_out, fharvard_out
 
@@ -1279,15 +1366,14 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
 
     fmni =  os.environ['FSLDIR'] + '/data/atlases/MNI/MNI-prob-1mm.nii.gz'
     fharvard =  os.environ['FSLDIR'] + '/data/atlases/HarvardOxford/HarvardOxford-sub-prob-1mm.nii.gz'
-    fgm_native, fwm_native, fcsf_native, fmni_native, fharvard_native = nonlinear_register_prob_maps(ffa, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir)
-    #fgm_native, fwm_native, fcsf_native, fmni_native, fharvard_native = register_prob_maps(ffa, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir)
+    fgm_native, fwm_native, fcsf_native, fmni_native, fharvard_native = register_prob_maps_ants(ffa, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir)
 
     # Perform iterative tissue classification
-    fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
+    #fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
    
     # Perform subcortical segmentation
-    finit_labels = initial_voxel_labels(subID, segDir, fharvard_native, fcsf_prob_out)
-    deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob_out, fcsf_prob_out, fharvard_native, segDir, subID, cpu_num=cpu_num)
+    #finit_labels = initial_voxel_labels(subID, segDir, fharvard_native, fcsf_prob_out)
+    #deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob_out, fcsf_prob_out, fharvard_native, segDir, subID, cpu_num=cpu_num)
 
     return
 
