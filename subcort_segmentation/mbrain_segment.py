@@ -26,6 +26,7 @@ from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 
 import itk
 
+# FSL Harvard Atlas label indices
 LEFT_WHITE_IDX = 0
 LEFT_CORTEX_IDX = 1
 LEFT_VENT_IDX = 2
@@ -36,7 +37,6 @@ LEFT_GLOB_IDX = 6
 BRAIN_STEM_IDX = 7
 LEFT_HIPPO_IDX = 8
 LEFT_AMYG_IDX = 9
-LEFT_HIPPOAMYG_IDX = 88
 LEFT_ACCUM_IDX = 10
 
 RIGHT_WHITE_IDX = 11
@@ -48,8 +48,16 @@ RIGHT_PUT_IDX = 16
 RIGHT_GLOB_IDX = 17
 RIGHT_HIPPO_IDX = 18
 RIGHT_AMYG_IDX = 19
-RIGHT_HIPPOAMYG_IDX = 188
 RIGHT_ACCUM_IDX = 20
+
+# Combined indices for MicroBrain
+LEFT_HIPPOAMYG_IDX = 88
+LEFT_STRIATUM_IDX = 66
+RIGHT_HIPPOAMYG_IDX = 188
+RIGHT_STRIATUM_IDX = 166
+
+#mirtk docker command
+mirtk_cmd='mirtk'
 
 
 # Check to see if program is installed to path and executable before running subprocess
@@ -331,7 +339,7 @@ def register_prob_maps_ants(fsource, ftemplate, fmask, fgm, fwm, fcsf, fmni, fha
 
     return fgm_out, fwm_out, fcsf_out, fmni_out, fharvard_out
 
-def initial_voxel_labels(subID, segDir, fharvard, fcsf_prob):
+def initial_voxel_labels(subID, segDir, fharvard):
     if not os.path.exists(segDir):
         os.system('mkdir ' + segDir)
 
@@ -348,16 +356,18 @@ def initial_voxel_labels(subID, segDir, fharvard, fcsf_prob):
                         LEFT_GLOB_IDX,
                         LEFT_HIPPO_IDX,
                         LEFT_AMYG_IDX,
-                        LEFT_HIPPOAMYG_IDX,
                         LEFT_ACCUM_IDX,
+                        LEFT_HIPPOAMYG_IDX,
+                        LEFT_STRIATUM_IDX,
                         RIGHT_THAL_IDX,
                         RIGHT_CAUDATE_IDX,
                         RIGHT_PUT_IDX,
                         RIGHT_GLOB_IDX,
                         RIGHT_HIPPO_IDX,
                         RIGHT_AMYG_IDX,
+                        RIGHT_ACCUM_IDX,
                         RIGHT_HIPPOAMYG_IDX,
-                        RIGHT_ACCUM_IDX]
+                        RIGHT_STRIATUM_IDX]
 
     subcort_label = ['LEFT_THALAMUS',
                     'LEFT_CAUDATE',
@@ -365,16 +375,18 @@ def initial_voxel_labels(subID, segDir, fharvard, fcsf_prob):
                     'LEFT_GLOBUS',
                     'LEFT_HIPPO',
                     'LEFT_AMYGDALA',
-                    'LEFT_HIPPOAMYG',
                     'LEFT_ACCUMBENS',
+                    'LEFT_HIPPOAMYG',
+                    'LEFT_STRIATUM',
                     'RIGHT_THALAMUS',
                     'RIGHT_CAUDATE',
                     'RIGHT_PUTAMEN',
                     'RIGHT_GLOBUS',
                     'RIGHT_HIPPO',
                     'RIGHT_AMYGDALA',
+                    'RIGHT_ACCUMBENS',
                     'RIGHT_HIPPOAMYG',
-                    'RIGHT_ACCUMBENS']
+                    'RIGHT_STRIATUM']
                         
     for sind,slabel in zip(subcort_ind,subcort_label):
         tmplabel = np.zeros(harvard_data.shape[0:3])
@@ -384,6 +396,10 @@ def initial_voxel_labels(subID, segDir, fharvard, fcsf_prob):
             tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,RIGHT_HIPPO_IDX] > 35, harvard_data[:,:,:,RIGHT_AMYG_IDX] > 35))] = 1
         elif sind == LEFT_HIPPOAMYG_IDX:
             tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,LEFT_HIPPO_IDX] > 35, harvard_data[:,:,:,LEFT_AMYG_IDX] > 35))] = 1
+        elif sind == RIGHT_STRIATUM_IDX:
+            tmplabel[binary_erosion(np.logical_or(np.logical_or(harvard_data[:,:,:,RIGHT_PUT_IDX] > 15, harvard_data[:,:,:,RIGHT_CAUDATE_IDX] > 15),harvard_data[:,:,:,RIGHT_ACCUM_IDX] > 15))] = 1
+        elif sind == LEFT_STRIATUM_IDX:
+            tmplabel[binary_erosion(np.logical_or(np.logical_or(harvard_data[:,:,:,LEFT_PUT_IDX] > 15, harvard_data[:,:,:,LEFT_CAUDATE_IDX] > 15),harvard_data[:,:,:,LEFT_ACCUM_IDX] > 15))] = 1
         elif sind == RIGHT_AMYG_IDX or sind == LEFT_AMYG_IDX:
             tmplabel[binary_erosion(harvard_data[:,:,:,sind] > 35)] = 1
         elif sind == RIGHT_HIPPO_IDX or sind == LEFT_HIPPO_IDX:
@@ -454,35 +470,38 @@ def surf_to_volume_mask(fdwi,fmesh,inside_val,fout):
     return 
 
 def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob, fcsf_prob, fharvard_native, segDir, subID, cpu_num=0):
-    min_edgelength = 0.7
-    max_edgelength = 1.2
-   
-    glob_min_edgelength = 0.6
-    glob_max_edgelength = 1.0
-
-    caud_min_edgelength = 0.7
-    caud_max_edgelength = 1.2
+    #min_edgelength = 0.7
+    #max_edgelength = 1.2
     
-    nac_min_edgelength = 0.5
-    nac_max_edgelength = 1.0
+    min_edgelength = 0.75
+    max_edgelength = 1.25
 
-    thal_min_edgelength = 0.9
-    thal_max_edgelength = 1.3
+    #glob_min_edgelength = 0.6
+    #glob_max_edgelength = 1.0
 
-    hippo_min_edgelength = 0.7
-    hippo_max_edgelength = 1.2
-
-    hippoamyg_min_edgelength = 0.7
-    hippoamyg_max_edgelength = 1.2
+    #caud_min_edgelength = 0.7
+    #caud_max_edgelength = 1.2
     
-    amyg_min_edgelength = 0.7
-    amyg_max_edgelength = 1.2
+    #nac_min_edgelength = 0.5
+    #nac_max_edgelength = 1.0
+
+    #thal_min_edgelength = 0.9
+    #thal_max_edgelength = 1.3
+
+    #hippo_min_edgelength = 0.7
+    #hippo_max_edgelength = 1.2
+
+    #hippoamyg_min_edgelength = 0.7
+    #hippoamyg_max_edgelength = 1.2
+    
+    #amyg_min_edgelength = 0.7
+    #amyg_max_edgelength = 1.2
 
     curv_w = 4.0
     gcurv_w = 2.0
 
-    caud_curv_w = 4.0
-    caud_gcurv_w = 2.0
+    #caud_curv_w = 4.0
+    #caud_gcurv_w = 2.0
 
     step_num = 200
     
@@ -521,22 +540,35 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob, fcsf_prob, fhar
     fnegdwi = segDir + os.path.basename(fdwi.replace(fsl_ext(),'_neg' + fsl_ext()))
     nib.save(nib.Nifti1Image(negdwi_data, dwi_img.affine), fnegdwi)
 
+    # Probabilistic based force for subcortical structures
+    glob_prob_force = np.zeros(dwi_data.shape)
+    glob_pos_ind = [LEFT_WHITE_IDX, LEFT_PUT_IDX, LEFT_CAUDATE_IDX, LEFT_ACCUM_IDX, RIGHT_WHITE_IDX, RIGHT_PUT_IDX, RIGHT_CAUDATE_IDX, RIGHT_ACCUM_IDX] 
+    glob_neg_ind = [LEFT_GLOB_IDX, RIGHT_GLOB_IDX]
+    for pos_ind in glob_pos_ind:
+        glob_prob_force = glob_prob_force + harvard_data[:,:,:,pos_ind]
+
+    for neg_ind in glob_neg_ind:
+        glob_prob_force = glob_prob_force - harvard_data[:,:,:,neg_ind]
+    
+    fglob_prob_force = segDir + subID + '_glob_prob_force' + fsl_ext()
+    nib.save(nib.Nifti1Image(glob_prob_force, fa_img.affine), fglob_prob_force)
+
     # Deform globus pallidus based on meanDWI and resticting movement into high FA regions
     fglobus_lh = segDir + subID + initial_seg_prefix + '_LEFT_GLOBUS.vtk'
     fglobus_lh_refined = fglobus_lh.replace(initial_seg_prefix,seg_prefix)
     if not os.path.exists(fglobus_lh_refined): 
-        os.system('mirtk deform-mesh ' + fglobus_lh + ' ' + fglobus_lh_refined + ' -image ' + fdwi + ' -edge-distance 2.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(glob_min_edgelength) + ' -max-edge-length ' + str(glob_max_edgelength))
+        os.system('mirtk deform-mesh ' + fglobus_lh + ' ' + fglobus_lh_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglob_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
         surf_to_volume_mask(fdwi, fglobus_lh_refined, 1, fglobus_lh_refined.replace('.vtk',fsl_ext()))
 
 
     fglobus_rh = segDir + subID + initial_seg_prefix + '_RIGHT_GLOBUS.vtk'
     fglobus_rh_refined = fglobus_rh.replace(initial_seg_prefix,seg_prefix)
     if not os.path.exists(fglobus_rh_refined):
-        os.system('mirtk deform-mesh ' + fglobus_rh + ' ' + fglobus_rh_refined + ' -image ' + fdwi + ' -edge-distance 2.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(glob_min_edgelength) + ' -max-edge-length ' + str(glob_max_edgelength))
+        os.system('mirtk deform-mesh ' + fglobus_rh + ' ' + fglobus_rh_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglob_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
         surf_to_volume_mask(fdwi, fglobus_rh_refined, 1, fglobus_rh_refined.replace('.vtk',fsl_ext()))
 
 
-    # Generate map for Putamen deformation
+    # Generate map for Striatum deformation
     fa_globus = np.zeros(MD_plusFA_data.shape)
     fa_globus[:] = MD_plusFA_data[:]
 
@@ -547,153 +579,78 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob, fcsf_prob, fhar
     fmd_plusFA_globus = segDir + os.path.basename(fmd_plusFA.replace(fsl_ext(),'_globus' + fsl_ext()))
     if not os.path.exists(fmd_plusFA_globus):
         nib.save(nib.Nifti1Image(fa_globus, fa_img.affine), fmd_plusFA_globus)
-
-    # Generate map to restrict deformation into accumbens
-    putamen_implicit = np.zeros(harvard_data.shape)
-    putamen_implicit = -1*(harvard_data[:,:,:,LEFT_PUT_IDX] + harvard_data[:,:,:,RIGHT_PUT_IDX])
-    putamen_implicit = putamen_implicit + harvard_data[:,:,:,LEFT_ACCUM_IDX] + harvard_data[:,:,:,RIGHT_ACCUM_IDX]
-    putamen_implicit = putamen_implicit + 0.1*(harvard_data[:,:,:,LEFT_WHITE_IDX] + harvard_data[:,:,:,RIGHT_WHITE_IDX])
-    putamen_implicit = putamen_implicit + 0.1*(harvard_data[:,:,:,LEFT_CORTEX_IDX] + harvard_data[:,:,:,RIGHT_CORTEX_IDX])
     
-    putamen_implicit = putamen_implicit / 100
-    putamen_implicit = putamen_implicit + csf_prob
-    fputamen_implicit = segDir + subID + '_putamen_implicit_force' + fsl_ext()
-    if not os.path.exists(fputamen_implicit):
-        nib.save(nib.Nifti1Image(putamen_implicit, harvard_img.affine), fputamen_implicit)
+    ## Use FA plus CSF prob map
+    #FA_plus_csfprob_globus = np.zeros(fa_data.shape)
+    #FA_plus_csfprob_globus[:] = fa_data[:]
+    #FA_plus_csfprob_globus[csf_prob > 0.75] = csf_prob[csf_prob > 0.75]
 
-    fputamen_lh = segDir + subID + initial_seg_prefix + '_LEFT_PUTAMEN.vtk'
-    fputamen_lh_refined = fputamen_lh.replace(initial_seg_prefix,seg_prefix)
-    if not os.path.exists(fputamen_lh_refined):
-        os.system('mirtk deform-mesh ' + fputamen_lh + ' ' + fputamen_lh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fputamen_implicit + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
-        #os.system('mirtk deform-mesh ' + fputamen_lh + ' ' + fputamen_lh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
-        surf_to_volume_mask(fdwi, fputamen_lh_refined, 1, fputamen_lh_refined.replace('.vtk',fsl_ext()))
+    #lh_globus_data = nib.load(fglobus_lh_refined.replace('.vtk',fsl_ext())).get_data()
+    #rh_globus_data = nib.load(fglobus_rh_refined.replace('.vtk',fsl_ext())).get_data()
+    #FA_plus_csfprob_globus[lh_globus_data == 1] = 1
+    #FA_plus_csfprob_globus[rh_globus_data == 1] = 1
 
-    fputamen_rh = segDir + subID + initial_seg_prefix + '_RIGHT_PUTAMEN.vtk'
-    fputamen_rh_refined = fputamen_rh.replace(initial_seg_prefix,seg_prefix)
-    if not os.path.exists(fputamen_rh_refined):
-        os.system('mirtk deform-mesh ' + fputamen_rh + ' ' + fputamen_rh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fputamen_implicit + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
-        #os.system('mirtk deform-mesh ' + fputamen_rh + ' ' + fputamen_rh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
-        surf_to_volume_mask(fdwi, fputamen_rh_refined, 1, fputamen_rh_refined.replace('.vtk',fsl_ext()))
+    #ffa_plusCSFprob_globus = segDir + subID + '_FA_plusCSFprob_globus' + fsl_ext()
+    #if not os.path.exists(ffa_plusCSFprob_globus):
+    #    nib.save(nib.Nifti1Image(FA_plus_csfprob_globus, fa_img.affine), ffa_plusCSFprob_globus)
 
-    fa_putamen = np.zeros(fa_data.shape)
-    fa_putamen[:] = fa_data[:]
+    # Probabilistic atlas based force for striatum
+    striatum_prob_force = np.zeros(dwi_data.shape)
+    striatum_pos_ind = [LEFT_CORTEX_IDX, LEFT_WHITE_IDX, LEFT_GLOB_IDX, RIGHT_CORTEX_IDX, RIGHT_WHITE_IDX, RIGHT_GLOB_IDX]
+    striatum_neg_ind = [LEFT_PUT_IDX, LEFT_CAUDATE_IDX, LEFT_ACCUM_IDX, RIGHT_PUT_IDX, RIGHT_CAUDATE_IDX, RIGHT_ACCUM_IDX]
+    for pos_ind in striatum_pos_ind:
+        striatum_prob_force = striatum_prob_force + harvard_data[:,:,:,pos_ind]
 
-    lh_putamen_data = nib.load(fputamen_lh_refined.replace('.vtk',fsl_ext())).get_data()
-    rh_putamen_data = nib.load(fputamen_rh_refined.replace('.vtk',fsl_ext())).get_data()
-    fa_putamen[lh_putamen_data == 1] = 1 
-    fa_putamen[rh_putamen_data == 1] = 1
-    ffa_putamen = segDir + os.path.basename(ffa.replace('FA' + fsl_ext(),'FA_putamen' + fsl_ext()))
-    if not os.path.exists(ffa_putamen):
-        nib.save(nib.Nifti1Image(fa_putamen, fa_img.affine), ffa_putamen)
-   
-    #globus_implicit = np.zeros(harvard_data.shape)
-    globus_implicit = -1*(harvard_data[:,:,:,LEFT_GLOB_IDX] + harvard_data[:,:,:,RIGHT_GLOB_IDX])
-    globus_implicit = globus_implicit + harvard_data[:,:,:,LEFT_ACCUM_IDX] + harvard_data[:,:,:,RIGHT_ACCUM_IDX]
-    globus_implicit = globus_implicit + harvard_data[:,:,:,LEFT_CAUDATE_IDX] + harvard_data[:,:,:,RIGHT_CAUDATE_IDX]
-    globus_implicit = globus_implicit + 0.1*(harvard_data[:,:,:,LEFT_WHITE_IDX] + harvard_data[:,:,:,RIGHT_WHITE_IDX])
-    globus_implicit = globus_implicit + 0.1*(harvard_data[:,:,:,LEFT_CORTEX_IDX] + harvard_data[:,:,:,RIGHT_CORTEX_IDX])
-    globus_implicit = globus_implicit / 100
+    for neg_ind in striatum_neg_ind:
+        striatum_prob_force = striatum_prob_force - harvard_data[:,:,:,neg_ind]
 
-    fglobus_implicit = segDir + subID + '_globus_implicit_force' + fsl_ext()
-    if not os.path.exists(fglobus_implicit):
-        nib.save(nib.Nifti1Image(globus_implicit, harvard_img.affine), fglobus_implicit)
+    fstriatum_prob_force = segDir + subID + '_striatum_prob_force' + fsl_ext()
+    nib.save(nib.Nifti1Image(striatum_prob_force, fa_img.affine), fstriatum_prob_force)
 
-    fglobus_lh_refined2 = fglobus_lh_refined.replace('.vtk','2.vtk')
-    if not os.path.exists(fglobus_lh_refined2):
-        os.system('mirtk deform-mesh ' + fglobus_lh + ' ' + fglobus_lh_refined2 + ' -image ' + ffa_putamen + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglobus_implicit + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(glob_min_edgelength) + ' -max-edge-length ' + str(glob_max_edgelength))
-        #os.system('mirtk deform-mesh ' + fglobus_lh + ' ' + fglobus_lh_refined2 + ' -image ' + ffa_putamen + ' -edge-distance 2.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(glob_min_edgelength) + ' -max-edge-length ' + str(glob_max_edgelength))
-        surf_to_volume_mask(fdwi, fglobus_lh_refined2, 1, fglobus_lh_refined2.replace('.vtk',fsl_ext()))
+    fstriatum_lh = segDir + subID + initial_seg_prefix + '_LEFT_STRIATUM.vtk'
+    fstriatum_lh_refined = fstriatum_lh.replace(initial_seg_prefix,seg_prefix)
+    #if not os.path.exists(fstriatum_lh_refined):
+    os.system('mirtk deform-mesh ' + fstriatum_lh + ' ' + fstriatum_lh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1  -distance-image ' + fstriatum_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.3')
+    surf_to_volume_mask(fdwi, fstriatum_lh_refined, 1, fstriatum_lh_refined.replace('.vtk',fsl_ext()))
 
-    fglobus_rh_refined2 = fglobus_rh_refined.replace('.vtk','2.vtk')
-    if not os.path.exists(fglobus_rh_refined2):
-        os.system('mirtk deform-mesh ' + fglobus_rh + ' ' + fglobus_rh_refined2 + ' -image ' + ffa_putamen + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglobus_implicit + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(glob_min_edgelength) + ' -max-edge-length ' + str(glob_max_edgelength))
-        #os.system('mirtk deform-mesh ' + fglobus_rh + ' ' + fglobus_rh_refined2 + ' -image ' + ffa_putamen + ' -edge-distance 2.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(glob_min_edgelength) + ' -max-edge-length ' + str(glob_max_edgelength))
-        surf_to_volume_mask(fdwi, fglobus_rh_refined2, 1, fglobus_rh_refined2.replace('.vtk',fsl_ext()))
-
-
-    caudate_implicit = np.zeros(harvard_data.shape)
-    caudate_implicit = -1 * (harvard_data[:,:,:,LEFT_CAUDATE_IDX] + harvard_data[:,:,:,RIGHT_CAUDATE_IDX]) 
-    caudate_implicit = caudate_implicit + harvard_data[:,:,:,LEFT_ACCUM_IDX] + harvard_data[:,:,:,RIGHT_ACCUM_IDX]
-    caudate_implicit = caudate_implicit + harvard_data[:,:,:,LEFT_THAL_IDX] + harvard_data[:,:,:,RIGHT_THAL_IDX]
-    caudate_implicit = caudate_implicit + harvard_data[:,:,:,LEFT_PUT_IDX] + harvard_data[:,:,:,RIGHT_PUT_IDX]
-    caudate_implicit = caudate_implicit + 0.1*(harvard_data[:,:,:,LEFT_WHITE_IDX] + harvard_data[:,:,:,RIGHT_WHITE_IDX])
-    caudate_implicit = caudate_implicit / 100
+    fstriatum_rh = segDir + subID + initial_seg_prefix + '_RIGHT_STRIATUM.vtk'
+    fstriatum_rh_refined = fstriatum_rh.replace(initial_seg_prefix,seg_prefix)
+    #if not os.path.exists(fstriatum_rh_refined):
+    os.system('mirtk deform-mesh ' + fstriatum_rh + ' ' + fstriatum_rh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1  -distance-image ' + fstriatum_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.3')
+    surf_to_volume_mask(fdwi, fstriatum_rh_refined, 1, fstriatum_rh_refined.replace('.vtk',fsl_ext()))
     
-    caudate_implicit = caudate_implicit + csf_prob
-
-    fcaudate_implicit = segDir + subID + '_caudate_implicit_force' + fsl_ext()
-    if not os.path.exists(fcaudate_implicit):
-        nib.save(nib.Nifti1Image(caudate_implicit, harvard_img.affine), fcaudate_implicit)
-
-    fcaudate_lh = segDir + subID + initial_seg_prefix + '_LEFT_CAUDATE.vtk'
-    fcaudate_lh_refined = fcaudate_lh.replace(initial_seg_prefix,seg_prefix)
-    if not os.path.exists(fcaudate_lh_refined):
-        os.system('mirtk deform-mesh ' + fcaudate_lh + ' ' + fcaudate_lh_refined + ' -image ' + fmd_plusFA + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fcaudate_implicit + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(caud_curv_w) + ' -gauss-curvature ' + str(caud_gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(caud_min_edgelength) + ' -max-edge-length ' + str(caud_max_edgelength) + ' -edge-distance-max-intensity 2.0')
-        surf_to_volume_mask(fdwi, fcaudate_lh_refined, 1, fcaudate_lh_refined.replace('.vtk',fsl_ext()))
-
-    fcaudate_rh = segDir + subID + initial_seg_prefix + '_RIGHT_CAUDATE.vtk'
-    fcaudate_rh_refined = fcaudate_rh.replace(initial_seg_prefix, seg_prefix)
-    if not os.path.exists(fcaudate_rh_refined):
-        os.system('mirtk deform-mesh ' + fcaudate_rh + ' ' + fcaudate_rh_refined + ' -image ' + fmd_plusFA + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fcaudate_implicit + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(caud_curv_w) + ' -gauss-curvature ' + str(caud_gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(caud_min_edgelength) + ' -max-edge-length ' + str(caud_max_edgelength) + ' -edge-distance-max-intensity 2.0')
-        surf_to_volume_mask(fdwi, fcaudate_rh_refined, 1, fcaudate_rh_refined.replace('.vtk',fsl_ext()))
-
-    accumbens_implicit = np.zeros(harvard_data.shape)
-    accumbens_implicit = -1 * (harvard_data[:,:,:,LEFT_ACCUM_IDX] + harvard_data[:,:,:,RIGHT_ACCUM_IDX]) 
-    accumbens_implicit = accumbens_implicit / 100
-    accumbens_implicit[accumbens_implicit < 0] = accumbens_implicit[accumbens_implicit < 0] + 0.25
-    #accumbens_implicit = accumbens_implicit + csf_prob
-    faccumbens_implicit = segDir + subID + '_accumbens_implicit_force' + fsl_ext()
-    if not os.path.exists(faccumbens_implicit):
-        nib.save(nib.Nifti1Image(accumbens_implicit, harvard_img.affine), faccumbens_implicit)
+    # Use FA plus CSF prob map
+    FA_plus_csfprob_striatum = np.zeros(fa_data.shape)
+    FA_plus_csfprob_striatum[:] = fa_data[:]
+    FA_plus_csfprob_striatum[csf_prob > 0.75] = csf_prob[csf_prob > 0.75]
     
-    # Restrict movement into now segmented caudate and putamen
-    MD_plusFA_caudate_putamen = np.zeros(MD_plusFA_data.shape)
-    MD_plusFA_caudate_putamen[:] = MD_plusFA_data[:]
+    lh_striatum_data = nib.load(fstriatum_lh_refined.replace('.vtk',fsl_ext())).get_data()
+    rh_striatum_data = nib.load(fstriatum_rh_refined.replace('.vtk',fsl_ext())).get_data()
+    #FA_plus_csfprob_striatum[lh_striatum_data == 1] = 1
+    #FA_plus_csfprob_striatum[rh_striatum_data == 1] = 1
+
+    ffa_plusCSFprob = segDir + subID + '_FA_plusCSFprob' + fsl_ext()
+    if not os.path.exists(ffa_plusCSFprob):
+        nib.save(nib.Nifti1Image(FA_plus_csfprob_striatum, fa_img.affine), ffa_plusCSFprob)
+
+
+    # Probabilistic atlas based force for thalamus
+    thal_prob_force = np.zeros(dwi_data.shape)
+    thal_pos_ind = [LEFT_CORTEX_IDX, LEFT_WHITE_IDX, LEFT_HIPPO_IDX, RIGHT_CORTEX_IDX, RIGHT_WHITE_IDX, RIGHT_HIPPO_IDX]
+    thal_neg_ind = [LEFT_THAL_IDX, RIGHT_THAL_IDX]
+    for pos_ind in thal_pos_ind:
+        thal_prob_force = thal_prob_force + harvard_data[:,:,:,pos_ind]
+
+    for neg_ind in thal_neg_ind:
+        thal_prob_force = thal_prob_force - harvard_data[:,:,:,neg_ind]
+
+    fthal_prob_force = segDir + subID + '_thalamus_prob_force' + fsl_ext()
+    nib.save(nib.Nifti1Image(thal_prob_force, fa_img.affine), fthal_prob_force)
     
-    lh_putamen_data = nib.load(fputamen_lh_refined.replace('.vtk',fsl_ext())).get_data()
-    rh_putamen_data = nib.load(fputamen_rh_refined.replace('.vtk',fsl_ext())).get_data()
-    MD_plusFA_caudate_putamen[lh_putamen_data == 1] = 2
-    MD_plusFA_caudate_putamen[rh_putamen_data == 1] = 2
-
-    lh_caudate_data = nib.load(fcaudate_lh_refined.replace('.vtk',fsl_ext())).get_data()
-    rh_caudate_data = nib.load(fcaudate_rh_refined.replace('.vtk',fsl_ext())).get_data()
-    MD_plusFA_caudate_putamen[lh_caudate_data == 1] = 2
-    MD_plusFA_caudate_putamen[rh_caudate_data == 1] = 2
-
-    fmd_plusFA_putamen_caudate = segDir + os.path.basename(fmd_plusFA.replace(fsl_ext(),'_putamen_caudate' + fsl_ext()))
-    if not os.path.exists(fmd_plusFA_putamen_caudate):
-        nib.save(nib.Nifti1Image(MD_plusFA_caudate_putamen, fa_img.affine), fmd_plusFA_putamen_caudate)
-
-    ## Nucleus Accumbens Segmentation
-    fnac_lh = segDir + subID + initial_seg_prefix + '_LEFT_ACCUMBENS.vtk'
-    fnac_lh_refined = fnac_lh.replace(initial_seg_prefix,seg_prefix)
-    if not os.path.exists(fnac_lh_refined):
-        os.system('mirtk deform-mesh ' + fnac_lh + ' ' + fnac_lh_refined + ' -image ' + fmd_plusFA_putamen_caudate + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + faccumbens_implicit + ' -distance 0.75 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(nac_min_edgelength) + ' -max-edge-length ' + str(nac_max_edgelength))
-        surf_to_volume_mask(fdwi, fnac_lh_refined, 1, fnac_lh_refined.replace('.vtk',fsl_ext()))
-
-    fnac_rh = segDir + subID + initial_seg_prefix + '_RIGHT_ACCUMBENS.vtk'
-    fnac_rh_refined = fnac_rh.replace(initial_seg_prefix,seg_prefix)
-    if not os.path.exists(fnac_rh_refined):
-        os.system('mirtk deform-mesh ' + fnac_rh + ' ' + fnac_rh_refined + ' -image ' + fmd_plusFA_putamen_caudate + ' -edge-distance 1.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + faccumbens_implicit + ' -distance 0.75 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.5 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(nac_min_edgelength) + ' -max-edge-length ' + str(nac_max_edgelength))
-    surf_to_volume_mask(fdwi, fnac_rh_refined, 1, fnac_rh_refined.replace('.vtk',fsl_ext()))
-   
-    thalamus_implicit = np.zeros(harvard_data.shape)
-    thalamus_implicit = -1 * (harvard_data[:,:,:,LEFT_THAL_IDX] + harvard_data[:,:,:,RIGHT_THAL_IDX])
-    thalamus_implicit = thalamus_implicit + harvard_data[:,:,:,LEFT_CAUDATE_IDX] + harvard_data[:,:,:,RIGHT_CAUDATE_IDX]
-    thalamus_implicit = thalamus_implicit + harvard_data[:,:,:,LEFT_HIPPO_IDX] + harvard_data[:,:,:,RIGHT_HIPPO_IDX]
-    thalamus_implicit = thalamus_implicit + harvard_data[:,:,:,BRAIN_STEM_IDX]
-    thalamus_implicit = thalamus_implicit + 0.1*(harvard_data[:,:,:,LEFT_WHITE_IDX] + harvard_data[:,:,:,RIGHT_WHITE_IDX])
-    thalamus_implicit = thalamus_implicit / 100
-    thalamus_implicit = thalamus_implicit + csf_prob
-    fthalamus_implicit = segDir + subID + '_thalamus_implicit_force' + fsl_ext()
-    if not os.path.exists(fthalamus_implicit):
-        nib.save(nib.Nifti1Image(thalamus_implicit, harvard_img.affine), fthalamus_implicit)
-    
-
     fthalamus = segDir + subID + initial_seg_prefix + '_THALAMUS.vtk'
     fthalamus_refined = fthalamus.replace(initial_seg_prefix,seg_prefix)
     if not os.path.exists(fthalamus_refined):
-        os.system('mirtk deform-mesh ' + fthalamus + ' ' + fthalamus_refined + ' -image ' + fmd_plusFA + ' -edge-distance 2.0 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fthalamus_implicit + ' -distance 0.75 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(thal_min_edgelength) + ' -max-edge-length ' + str(thal_max_edgelength))
+        os.system('mirtk deform-mesh ' + fthalamus + ' ' + fthalamus_refined + ' -image ' + ffa_plusCSFprob + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fthal_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.4')
 
     thalamus_surf = sutil.read_surf_vtk(fthalamus_refined)
     [lh_thalamus, rh_thalamus] = sutil.split_surface_by_label(thalamus_surf,label=[LEFT_THAL_IDX,RIGHT_THAL_IDX],label_name='struct_label')
@@ -714,191 +671,196 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob, fcsf_prob, fhar
     fhippoamyg_rh = segDir + subID + initial_seg_prefix + '_RIGHT_HIPPOAMYG.vtk'
     fhippoamyg_rh_refined = fhippoamyg_rh.replace(initial_seg_prefix,seg_prefix)
 
-    fhippo_lh = segDir + subID + initial_seg_prefix + '_LEFT_HIPPO.vtk'
-    fhippo_lh_refined = fhippo_lh.replace(initial_seg_prefix,seg_prefix)
-    fhippo_rh = segDir + subID + initial_seg_prefix + '_RIGHT_HIPPO.vtk'
-    fhippo_rh_refined = fhippo_rh.replace(initial_seg_prefix,seg_prefix)
+    #fhippo_lh = segDir + subID + initial_seg_prefix + '_LEFT_HIPPO.vtk'
+    #fhippo_lh_refined = fhippo_lh.replace(initial_seg_prefix,seg_prefix)
+    #fhippo_rh = segDir + subID + initial_seg_prefix + '_RIGHT_HIPPO.vtk'
+    #fhippo_rh_refined = fhippo_rh.replace(initial_seg_prefix,seg_prefix)
 
-    famyg_lh = segDir + subID + initial_seg_prefix + '_LEFT_AMYGDALA.vtk'
-    famyg_lh_refined = famyg_lh.replace(initial_seg_prefix,seg_prefix)
-    famyg_rh = segDir + subID + initial_seg_prefix + '_RIGHT_AMYGDALA.vtk'
-    famyg_rh_refined = famyg_rh.replace(initial_seg_prefix,seg_prefix)
+    #famyg_lh = segDir + subID + initial_seg_prefix + '_LEFT_AMYGDALA.vtk'
+    #famyg_lh_refined = famyg_lh.replace(initial_seg_prefix,seg_prefix)
+    #famyg_rh = segDir + subID + initial_seg_prefix + '_RIGHT_AMYGDALA.vtk'
+    #famyg_rh_refined = famyg_rh.replace(initial_seg_prefix,seg_prefix)
+    
+    # Probabilistic atlas based force for thalamus
+    hipamyg_prob_force = np.zeros(dwi_data.shape)
+    #hipamyg_pos_ind = [LEFT_CORTEX_IDX, LEFT_WHITE_IDX, LEFT_THAL_IDX, RIGHT_CORTEX_IDX, RIGHT_WHITE_IDX, RIGHT_THAL_IDX, BRAIN_STEM_IDX]
+    hipamyg_pos_ind = [LEFT_CORTEX_IDX, LEFT_THAL_IDX, RIGHT_CORTEX_IDX, RIGHT_THAL_IDX, BRAIN_STEM_IDX]
+    hipamyg_neg_ind = [LEFT_HIPPO_IDX, LEFT_AMYG_IDX, RIGHT_HIPPO_IDX, RIGHT_AMYG_IDX]
+    for pos_ind in hipamyg_pos_ind:
+        hipamyg_prob_force = hipamyg_prob_force + harvard_data[:,:,:,pos_ind]
 
-    fhippo_implicit = segDir + subID + '_hippo_implicit_force' + fsl_ext()
-    if not os.path.exists(fhippo_implicit):
-        hippo_implicit = np.zeros(harvard_data.shape)
-        hippo_implicit = -1*(harvard_data[:,:,:,LEFT_HIPPO_IDX] + harvard_data[:,:,:,RIGHT_HIPPO_IDX])
-        hippo_implicit = hippo_implicit - harvard_data[:,:,:,LEFT_AMYG_IDX] - harvard_data[:,:,:,RIGHT_AMYG_IDX]
-        hippo_implicit = hippo_implicit + 1.0*(harvard_data[:,:,:,LEFT_WHITE_IDX] + harvard_data[:,:,:,RIGHT_WHITE_IDX])
-        hippo_implicit = hippo_implicit + 1.0*(harvard_data[:,:,:,LEFT_CORTEX_IDX] + harvard_data[:,:,:,RIGHT_CORTEX_IDX])
-        hippo_implicit = hippo_implicit + 1.0*(harvard_data[:,:,:,BRAIN_STEM_IDX])
-        hippo_implicit = hippo_implicit / 100
-        hippo_implicit = hippo_implicit + csf_prob
-        nib.save(nib.Nifti1Image(hippo_implicit, harvard_img.affine), fhippo_implicit)
+    for neg_ind in hipamyg_neg_ind:
+        hipamyg_prob_force = hipamyg_prob_force - harvard_data[:,:,:,neg_ind]
 
-    # Get a rough estimate of GM signal intensity so deformations are avoided into regions of hyperintensities of the temporal lobe
+    # Use previously calculated White probability rather than atlas probability that doesn't register well
+    hipamyg_prob_force = hipamyg_prob_force + wm_prob*100
+
+    fhipamyg_prob_force = segDir + subID + '_hipamyg_prob_force' + fsl_ext()
+    nib.save(nib.Nifti1Image(hipamyg_prob_force, fa_img.affine), fhipamyg_prob_force)
+
+    ## Get a rough estimate of GM signal intensity so deformations are avoided into regions of hyperintensities of the temporal lobe
     hippo_amyg_mask = harvard_data[:,:,:,LEFT_AMYG_IDX] + harvard_data[:,:,:,RIGHT_AMYG_IDX] + harvard_data[:,:,:,LEFT_HIPPO_IDX] + harvard_data[:,:,:,RIGHT_HIPPO_IDX]
     mean_dwival = np.mean(dwi_data[hippo_amyg_mask > 0])
     std_dwival = np.std(dwi_data[hippo_amyg_mask > 0])
     upperbound = -1*(mean_dwival + 2* std_dwival)
 
-    if not os.path.exists(fhippoamyg_lh_refined):
-        os.system('mirtk deform-mesh ' + fhippoamyg_lh + ' ' + fhippoamyg_lh_refined + ' -image ' + fnegdwi + ' -edge-distance 1.0 -edge-distance-averaging 8 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_implicit + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(hippoamyg_min_edgelength) + ' -max-edge-length ' + str(hippoamyg_max_edgelength) + ' -edge-distance-min-intensity ' + str(upperbound))
-        surf_to_volume_mask(fdwi, fhippoamyg_lh_refined, 1, fhippoamyg_lh_refined.replace('.vtk',fsl_ext()))
+    #if not os.path.exists(fhippoamyg_lh_refined):
+    os.system('mirtk deform-mesh ' + fhippoamyg_lh + ' ' + fhippoamyg_lh_refined + ' -image ' + fnegdwi + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity ' + str(upperbound))
+    surf_to_volume_mask(fdwi, fhippoamyg_lh_refined, 1, fhippoamyg_lh_refined.replace('.vtk',fsl_ext()))
 
-    if not os.path.exists(fhippoamyg_rh_refined):
-        os.system('mirtk deform-mesh ' + fhippoamyg_rh + ' ' + fhippoamyg_rh_refined + ' -image ' + fnegdwi + ' -edge-distance 1.0 -edge-distance-averaging 8 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_implicit + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(hippoamyg_min_edgelength) + ' -max-edge-length ' + str(hippoamyg_max_edgelength) + ' -edge-distance-min-intensity ' + str(upperbound))
-        surf_to_volume_mask(fdwi, fhippoamyg_rh_refined, 1, fhippoamyg_rh_refined.replace('.vtk',fsl_ext()))
+    #if not os.path.exists(fhippoamyg_rh_refined):
+    os.system('mirtk deform-mesh ' + fhippoamyg_rh + ' ' + fhippoamyg_rh_refined + ' -image ' + fnegdwi + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity ' + str(upperbound))
+    surf_to_volume_mask(fdwi, fhippoamyg_rh_refined, 1, fhippoamyg_rh_refined.replace('.vtk',fsl_ext()))
    
-    # Run 3 channel tissue segmentation to separate amygdala from hippocampus
-    # prepare prob maps and separate primary eigenvector into separate nifti file
-    atropos_prefix_lh = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_LH'
-    atropos_prefix_lh_label = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_LH_LABELS' + fsl_ext()
-    atropos_prefix_lh_probout = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_LH_PROBOUT_'
-    
-    famyg_lh_prob = atropos_prefix_lh + '_01' + fsl_ext()
-    if not os.path.exists(famyg_lh_prob):
-        nib.save(nib.Nifti1Image(harvard_data[:,:,:,LEFT_AMYG_IDX]/100, harvard_img.affine), famyg_lh_prob)
+    ## Run 3 channel tissue segmentation to separate amygdala from hippocampus
+    ## prepare prob maps and separate primary eigenvector into separate nifti file
+    #atropos_prefix_lh = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_LH'
+    #atropos_prefix_lh_label = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_LH_LABELS' + fsl_ext()
+    #atropos_prefix_lh_probout = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_LH_PROBOUT_'
+    #
+    #famyg_lh_prob = atropos_prefix_lh + '_01' + fsl_ext()
+    #if not os.path.exists(famyg_lh_prob):
+    #    nib.save(nib.Nifti1Image(harvard_data[:,:,:,LEFT_AMYG_IDX]/100, harvard_img.affine), famyg_lh_prob)
 
-    fhippo_lh_prob = atropos_prefix_lh + '_02' + fsl_ext()
-    if not os.path.exists(fhippo_lh_prob):
-        nib.save(nib.Nifti1Image(harvard_data[:,:,:,LEFT_HIPPO_IDX]/100, harvard_img.affine), fhippo_lh_prob)
+    #fhippo_lh_prob = atropos_prefix_lh + '_02' + fsl_ext()
+    #if not os.path.exists(fhippo_lh_prob):
+    #    nib.save(nib.Nifti1Image(harvard_data[:,:,:,LEFT_HIPPO_IDX]/100, harvard_img.affine), fhippo_lh_prob)
 
-    fcortex_lh_prob = atropos_prefix_lh + '_03' + fsl_ext()
-    if not os.path.exists(fcortex_lh_prob):
-        nib.save(nib.Nifti1Image(harvard_data[:,:,:,LEFT_CORTEX_IDX]/100, harvard_img.affine), fcortex_lh_prob)
+    #fcortex_lh_prob = atropos_prefix_lh + '_03' + fsl_ext()
+    #if not os.path.exists(fcortex_lh_prob):
+    #    nib.save(nib.Nifti1Image(harvard_data[:,:,:,LEFT_CORTEX_IDX]/100, harvard_img.affine), fcortex_lh_prob)
 
-    atropos_prefix_rh = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_RH'
-    atropos_prefix_rh_label = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_RH_LABELS' + fsl_ext()
-    atropos_prefix_rh_probout = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_RH_PROBOUT_'
+    #atropos_prefix_rh = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_RH'
+    #atropos_prefix_rh_label = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_RH_LABELS' + fsl_ext()
+    #atropos_prefix_rh_probout = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO_RH_PROBOUT_'
 
-    famyg_rh_prob = atropos_prefix_rh + '_01' + fsl_ext()
-    if not os.path.exists(famyg_rh_prob):
-        nib.save(nib.Nifti1Image(harvard_data[:,:,:,RIGHT_AMYG_IDX]/100, harvard_img.affine), famyg_rh_prob)
+    #famyg_rh_prob = atropos_prefix_rh + '_01' + fsl_ext()
+    #if not os.path.exists(famyg_rh_prob):
+    #    nib.save(nib.Nifti1Image(harvard_data[:,:,:,RIGHT_AMYG_IDX]/100, harvard_img.affine), famyg_rh_prob)
 
-    fhippo_rh_prob = atropos_prefix_rh + '_02' + fsl_ext()
-    if not os.path.exists(fhippo_rh_prob):
-        nib.save(nib.Nifti1Image(harvard_data[:,:,:,RIGHT_HIPPO_IDX]/100, harvard_img.affine), fhippo_rh_prob)    
+    #fhippo_rh_prob = atropos_prefix_rh + '_02' + fsl_ext()
+    #if not os.path.exists(fhippo_rh_prob):
+    #    nib.save(nib.Nifti1Image(harvard_data[:,:,:,RIGHT_HIPPO_IDX]/100, harvard_img.affine), fhippo_rh_prob)    
 
-    fcortex_rh_prob = atropos_prefix_rh + '_03' + fsl_ext()
-    if not os.path.exists(fcortex_rh_prob):
-        nib.save(nib.Nifti1Image(harvard_data[:,:,:,RIGHT_CORTEX_IDX]/100, harvard_img.affine), fcortex_rh_prob)
+    #fcortex_rh_prob = atropos_prefix_rh + '_03' + fsl_ext()
+    #if not os.path.exists(fcortex_rh_prob):
+    #    nib.save(nib.Nifti1Image(harvard_data[:,:,:,RIGHT_CORTEX_IDX]/100, harvard_img.affine), fcortex_rh_prob)
 
-    atropos_prefix = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO'
-    fprim_x = atropos_prefix + '_primeigx' + fsl_ext()
-    if not os.path.exists(fprim_x):
-        nib.save(nib.Nifti1Image(prim_data[:,:,:,0], prim_img.affine), fprim_x)
+    #atropos_prefix = segDir + subID + initial_seg_prefix + '_INITAMYGHIPPO'
+    #fprim_x = atropos_prefix + '_primeigx' + fsl_ext()
+    #if not os.path.exists(fprim_x):
+    #    nib.save(nib.Nifti1Image(prim_data[:,:,:,0], prim_img.affine), fprim_x)
 
-    fprim_y = atropos_prefix + '_primeigy' + fsl_ext()
-    if not os.path.exists(fprim_y):
-        nib.save(nib.Nifti1Image(prim_data[:,:,:,1], prim_img.affine), fprim_y)
+    #fprim_y = atropos_prefix + '_primeigy' + fsl_ext()
+    #if not os.path.exists(fprim_y):
+    #    nib.save(nib.Nifti1Image(prim_data[:,:,:,1], prim_img.affine), fprim_y)
 
-    fprim_z = atropos_prefix + '_primeigz' + fsl_ext()
-    if not os.path.exists(fprim_z):
-        nib.save(nib.Nifti1Image(prim_data[:,:,:,2], prim_img.affine), fprim_z)
+    #fprim_z = atropos_prefix + '_primeigz' + fsl_ext()
+    #if not os.path.exists(fprim_z):
+    #    nib.save(nib.Nifti1Image(prim_data[:,:,:,2], prim_img.affine), fprim_z)
 
-    # Run 3-channel segmentation based on primary eigen vector
-    #Left hemisphere
-    PriorWeight=0.3
-    if not os.path.exists(atropos_prefix_lh_label):
-        system('Atropos' +
-            ' -a [' + fprim_x + ']' +
-            ' -a [' + fprim_y + ']' +
-            ' -a [' + fprim_z + ']' +
-            ' -x ' + fhippoamyg_lh_refined.replace('.vtk',fsl_ext()) +
-            ' -i PriorProbabilityImages[3, ' + atropos_prefix_lh + '_%02d' + fsl_ext() + ',' + str(PriorWeight) + ',0.0001]' +
-            ' -m [0.3, 2x2x2] ' +
-            ' --use-partial-volume-likelihoods false ' +
-            ' -s 1x3 -s 1x2 ' +
-            ' -o [' + atropos_prefix_lh_label + ',' + atropos_prefix_lh_probout + '%02d' + fsl_ext() + ']' +
-            ' -k HistogramParzenWindows[1.0,32]' +
-            ' -v 1')
+    ## Run 3-channel segmentation based on primary eigen vector
+    ##Left hemisphere
+    #PriorWeight=0.3
+    #if not os.path.exists(atropos_prefix_lh_label):
+    #    system('Atropos' +
+    #        ' -a [' + fprim_x + ']' +
+    #        ' -a [' + fprim_y + ']' +
+    #        ' -a [' + fprim_z + ']' +
+    #        ' -x ' + fhippoamyg_lh_refined.replace('.vtk',fsl_ext()) +
+    #        ' -i PriorProbabilityImages[3, ' + atropos_prefix_lh + '_%02d' + fsl_ext() + ',' + str(PriorWeight) + ',0.0001]' +
+    #        ' -m [0.3, 2x2x2] ' +
+    #        ' --use-partial-volume-likelihoods false ' +
+    #        ' -s 1x3 -s 1x2 ' +
+    #        ' -o [' + atropos_prefix_lh_label + ',' + atropos_prefix_lh_probout + '%02d' + fsl_ext() + ']' +
+    #        ' -k HistogramParzenWindows[1.0,32]' +
+    #        ' -v 1')
 
-    if not os.path.exists(atropos_prefix_rh_label):
-        system('Atropos' +
-            ' -a [' + fprim_x + ']' +
-            ' -a [' + fprim_y + ']' +
-            ' -a [' + fprim_z + ']' +
-            ' -x ' + fhippoamyg_rh_refined.replace('.vtk',fsl_ext()) +
-            ' -i PriorProbabilityImages[3, ' + atropos_prefix_rh + '_%02d' + fsl_ext() + ',' + str(PriorWeight) + ',0.0001]' +
-            ' -m [0.3, 2x2x2] ' +
-            ' --use-partial-volume-likelihoods false ' +
-            ' -s 1x3 -s 1x2 ' +
-            ' -o [' + atropos_prefix_rh_label + ',' + atropos_prefix_rh_probout + '%02d' + fsl_ext() + ']' +
-            ' -k HistogramParzenWindows[1.0,32]' +
-            ' -v 1')
+    #if not os.path.exists(atropos_prefix_rh_label):
+    #    system('Atropos' +
+    #        ' -a [' + fprim_x + ']' +
+    #        ' -a [' + fprim_y + ']' +
+    #        ' -a [' + fprim_z + ']' +
+    #        ' -x ' + fhippoamyg_rh_refined.replace('.vtk',fsl_ext()) +
+    #        ' -i PriorProbabilityImages[3, ' + atropos_prefix_rh + '_%02d' + fsl_ext() + ',' + str(PriorWeight) + ',0.0001]' +
+    #        ' -m [0.3, 2x2x2] ' +
+    #        ' --use-partial-volume-likelihoods false ' +
+    #        ' -s 1x3 -s 1x2 ' +
+    #        ' -o [' + atropos_prefix_rh_label + ',' + atropos_prefix_rh_probout + '%02d' + fsl_ext() + ']' +
+    #        ' -k HistogramParzenWindows[1.0,32]' +
+    #        ' -v 1')
 
 
-    # repeat hippocampus deformation using primary eigenvector based force
-    amyg_lh_prob_out = nib.load(atropos_prefix_lh_probout + '01' + fsl_ext()).get_data()
-    hippo_lh_prob_out = nib.load(atropos_prefix_lh_probout + '02' + fsl_ext()).get_data()
-    cortex_lh_prob_out = nib.load(atropos_prefix_lh_probout + '03' + fsl_ext()).get_data()
-    
-    amyg_rh_prob_out = nib.load(atropos_prefix_rh_probout + '01' + fsl_ext()).get_data()
-    hippo_rh_prob_out = nib.load(atropos_prefix_rh_probout + '02' + fsl_ext()).get_data()
-    cortex_rh_prob_out = nib.load(atropos_prefix_rh_probout + '03' + fsl_ext()).get_data()
+    ## repeat hippocampus deformation using primary eigenvector based force
+    #amyg_lh_prob_out = nib.load(atropos_prefix_lh_probout + '01' + fsl_ext()).get_data()
+    #hippo_lh_prob_out = nib.load(atropos_prefix_lh_probout + '02' + fsl_ext()).get_data()
+    #cortex_lh_prob_out = nib.load(atropos_prefix_lh_probout + '03' + fsl_ext()).get_data()
+    #
+    #amyg_rh_prob_out = nib.load(atropos_prefix_rh_probout + '01' + fsl_ext()).get_data()
+    #hippo_rh_prob_out = nib.load(atropos_prefix_rh_probout + '02' + fsl_ext()).get_data()
+    #cortex_rh_prob_out = nib.load(atropos_prefix_rh_probout + '03' + fsl_ext()).get_data()
 
-    # repeat amygdala deformation using primary eigenvector based force
-    famyg_implicit_eig = segDir + subID + '_amyg_implicit_force_eigenvectors' + fsl_ext()
-    if not os.path.exists(famyg_implicit_eig):
-        amyg_implicit = np.zeros(harvard_data.shape)
-        amyg_implicit = -1*(amyg_lh_prob_out + amyg_rh_prob_out)
-        amyg_implicit = amyg_implicit + hippo_lh_prob_out + hippo_rh_prob_out
-        amyg_implicit = amyg_implicit + cortex_lh_prob_out + cortex_rh_prob_out
-        amyg_implicit[amyg_implicit == 0] = 0.1 
-        amyg_implicit = amyg_implicit + csf_prob
-        nib.save(nib.Nifti1Image(amyg_implicit, harvard_img.affine), famyg_implicit_eig)
+    ## repeat amygdala deformation using primary eigenvector based force
+    #famyg_implicit_eig = segDir + subID + '_amyg_implicit_force_eigenvectors' + fsl_ext()
+    #if not os.path.exists(famyg_implicit_eig):
+    #    amyg_implicit = np.zeros(harvard_data.shape)
+    #    amyg_implicit = -1*(amyg_lh_prob_out + amyg_rh_prob_out)
+    #    amyg_implicit = amyg_implicit + hippo_lh_prob_out + hippo_rh_prob_out
+    #    amyg_implicit = amyg_implicit + cortex_lh_prob_out + cortex_rh_prob_out
+    #    amyg_implicit[amyg_implicit == 0] = 0.1 
+    #    amyg_implicit = amyg_implicit + csf_prob
+    #    nib.save(nib.Nifti1Image(amyg_implicit, harvard_img.affine), famyg_implicit_eig)
 
-    if not os.path.exists(famyg_lh_refined):
-        os.system('mirtk deform-mesh ' + famyg_lh + ' ' + famyg_lh_refined + ' -image ' + fnegdwi + ' -edge-distance 0.5 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + famyg_implicit_eig + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(amyg_min_edgelength) + ' -max-edge-length ' + str(amyg_max_edgelength)  + ' -edge-distance-min-intensity ' + str(upperbound))
-        surf_to_volume_mask(fdwi, famyg_lh_refined, 1, famyg_lh_refined.replace('.vtk',fsl_ext()))
+    #if not os.path.exists(famyg_lh_refined):
+    #    os.system('mirtk deform-mesh ' + famyg_lh + ' ' + famyg_lh_refined + ' -image ' + fnegdwi + ' -edge-distance 0.5 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + famyg_implicit_eig + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(amyg_min_edgelength) + ' -max-edge-length ' + str(amyg_max_edgelength)  + ' -edge-distance-min-intensity ' + str(upperbound))
+    #    surf_to_volume_mask(fdwi, famyg_lh_refined, 1, famyg_lh_refined.replace('.vtk',fsl_ext()))
 
-    if not os.path.exists(famyg_rh_refined):
-        os.system('mirtk deform-mesh ' + famyg_rh + ' ' + famyg_rh_refined + ' -image ' + fnegdwi + ' -edge-distance 0.5 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + famyg_implicit_eig + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(amyg_min_edgelength) + ' -max-edge-length ' + str(amyg_max_edgelength)  + ' -edge-distance-min-intensity ' + str(upperbound))
-        surf_to_volume_mask(fdwi, famyg_rh_refined, 1, famyg_rh_refined.replace('.vtk',fsl_ext()))
+    #if not os.path.exists(famyg_rh_refined):
+    #    os.system('mirtk deform-mesh ' + famyg_rh + ' ' + famyg_rh_refined + ' -image ' + fnegdwi + ' -edge-distance 0.5 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + famyg_implicit_eig + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(amyg_min_edgelength) + ' -max-edge-length ' + str(amyg_max_edgelength)  + ' -edge-distance-min-intensity ' + str(upperbound))
+    #    surf_to_volume_mask(fdwi, famyg_rh_refined, 1, famyg_rh_refined.replace('.vtk',fsl_ext()))
 
-    amyg_lh_refined = nib.load(famyg_lh_refined.replace('.vtk',fsl_ext())).get_data()
-    amyg_rh_refined = nib.load(famyg_rh_refined.replace('.vtk',fsl_ext())).get_data()
+    #amyg_lh_refined = nib.load(famyg_lh_refined.replace('.vtk',fsl_ext())).get_data()
+    #amyg_rh_refined = nib.load(famyg_rh_refined.replace('.vtk',fsl_ext())).get_data()
 
-    fhippo_implicit_eig = segDir + subID + '_hippo_implicit_force_eigenvectors' + fsl_ext()
-    if not os.path.exists(fhippo_implicit_eig):
-        hippo_implicit = np.zeros(harvard_data.shape)
-        hippo_implicit = -1*(hippo_lh_prob_out + hippo_rh_prob_out)
-        hippo_implicit = hippo_implicit + 2*(amyg_lh_refined + amyg_rh_refined)
-        hippo_implicit = hippo_implicit + cortex_lh_prob_out + cortex_rh_prob_out
-        hippo_implicit = hippo_implicit + csf_prob
-        #hippo_implicit[hippo_implicit == 0] = 0.05
-        nib.save(nib.Nifti1Image(hippo_implicit, harvard_img.affine), fhippo_implicit_eig)
+    #fhippo_implicit_eig = segDir + subID + '_hippo_implicit_force_eigenvectors' + fsl_ext()
+    #if not os.path.exists(fhippo_implicit_eig):
+    #    hippo_implicit = np.zeros(harvard_data.shape)
+    #    hippo_implicit = -1*(hippo_lh_prob_out + hippo_rh_prob_out)
+    #    hippo_implicit = hippo_implicit + 2*(amyg_lh_refined + amyg_rh_refined)
+    #    hippo_implicit = hippo_implicit + cortex_lh_prob_out + cortex_rh_prob_out
+    #    hippo_implicit = hippo_implicit + csf_prob
+    #    #hippo_implicit[hippo_implicit == 0] = 0.05
+    #    nib.save(nib.Nifti1Image(hippo_implicit, harvard_img.affine), fhippo_implicit_eig)
 
-    if not os.path.exists(fhippo_lh_refined):
-        os.system('mirtk deform-mesh ' + fhippoamyg_lh_refined + ' ' + fhippo_lh_refined + ' -image ' + fnegdwi + ' -edge-distance 0.5 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_implicit_eig + ' -distance 0.6 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(hippo_min_edgelength) + ' -max-edge-length ' + str(hippo_max_edgelength)  + ' -edge-distance-min-intensity ' + str(upperbound))
-        surf_to_volume_mask(fdwi, fhippo_lh_refined, 1, fhippo_lh_refined.replace('.vtk',fsl_ext()))
+    #if not os.path.exists(fhippo_lh_refined):
+    #    os.system('mirtk deform-mesh ' + fhippoamyg_lh_refined + ' ' + fhippo_lh_refined + ' -image ' + fnegdwi + ' -edge-distance 0.5 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_implicit_eig + ' -distance 0.6 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(hippo_min_edgelength) + ' -max-edge-length ' + str(hippo_max_edgelength)  + ' -edge-distance-min-intensity ' + str(upperbound))
+    #    surf_to_volume_mask(fdwi, fhippo_lh_refined, 1, fhippo_lh_refined.replace('.vtk',fsl_ext()))
 
-    if not os.path.exists(fhippo_rh_refined):
-        os.system('mirtk deform-mesh ' + fhippoamyg_rh_refined + ' ' + fhippo_rh_refined + ' -image ' + fnegdwi + ' -edge-distance 0.5 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_implicit_eig + ' -distance 0.6 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(hippo_min_edgelength) + ' -max-edge-length ' + str(hippo_max_edgelength)  + ' -edge-distance-min-intensity ' + str(upperbound))
-        surf_to_volume_mask(fdwi, fhippo_rh_refined, 1, fhippo_rh_refined.replace('.vtk',fsl_ext()))
+    #if not os.path.exists(fhippo_rh_refined):
+    #    os.system('mirtk deform-mesh ' + fhippoamyg_rh_refined + ' ' + fhippo_rh_refined + ' -image ' + fnegdwi + ' -edge-distance 0.5 -edge-distance-averaging 4 2 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_implicit_eig + ' -distance 0.6 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(hippo_min_edgelength) + ' -max-edge-length ' + str(hippo_max_edgelength)  + ' -edge-distance-min-intensity ' + str(upperbound))
+    #    surf_to_volume_mask(fdwi, fhippo_rh_refined, 1, fhippo_rh_refined.replace('.vtk',fsl_ext()))
 
-    # Append subcort surfs together into single vtk file
-    fsubcortseg_vtk = segDir + subID + seg_prefix + '_subcortGM.vtk'
-    if not os.path.exists(fsubcortseg_vtk):
-        appender = vtk.vtkAppendPolyData()
-        appender.AddInputData(sutil.read_surf_vtk(fputamen_lh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(fputamen_rh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(fglobus_lh_refined2))
-        appender.AddInputData(sutil.read_surf_vtk(fglobus_rh_refined2))
-        appender.AddInputData(sutil.read_surf_vtk(fcaudate_lh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(fcaudate_rh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(fthalamus_lh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(fthalamus_rh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(famyg_rh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(famyg_lh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(fhippo_rh_refined))
-        appender.AddInputData(sutil.read_surf_vtk(fhippo_lh_refined))
-    
-        appender.Update()
-        
-        deepGM_surf = appender.GetOutput()
-        sutil.write_surf_vtk(deepGM_surf, fsubcortseg_vtk)
+    ## Append subcort surfs together into single vtk file
+    #fsubcortseg_vtk = segDir + subID + seg_prefix + '_subcortGM.vtk'
+    #if not os.path.exists(fsubcortseg_vtk):
+    #    appender = vtk.vtkAppendPolyData()
+    #    appender.AddInputData(sutil.read_surf_vtk(fputamen_lh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(fputamen_rh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(fglobus_lh_refined2))
+    #    appender.AddInputData(sutil.read_surf_vtk(fglobus_rh_refined2))
+    #    appender.AddInputData(sutil.read_surf_vtk(fcaudate_lh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(fcaudate_rh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(fthalamus_lh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(fthalamus_rh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(famyg_rh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(famyg_lh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(fhippo_rh_refined))
+    #    appender.AddInputData(sutil.read_surf_vtk(fhippo_lh_refined))
+    #
+    #    appender.Update()
+    #    
+    #    deepGM_surf = appender.GetOutput()
+    #    sutil.write_surf_vtk(deepGM_surf, fsubcortseg_vtk)
 
     return 
 
@@ -1369,11 +1331,11 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
     fgm_native, fwm_native, fcsf_native, fmni_native, fharvard_native = register_prob_maps_ants(ffa, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir)
 
     # Perform iterative tissue classification
-    #fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
+    fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
    
     # Perform subcortical segmentation
-    #finit_labels = initial_voxel_labels(subID, segDir, fharvard_native, fcsf_prob_out)
-    #deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob_out, fcsf_prob_out, fharvard_native, segDir, subID, cpu_num=cpu_num)
+    finit_labels = initial_voxel_labels(subID, segDir, fharvard_native)
+    deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob_out, fcsf_prob_out, fharvard_native, segDir, subID, cpu_num=cpu_num)
 
     return
 
