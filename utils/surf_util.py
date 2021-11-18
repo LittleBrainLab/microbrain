@@ -58,6 +58,7 @@ def write_surf_vtk(surfVTK, fname):
     writer = vtk.vtkPolyDataWriter()
     writer.SetFileName(fname)
     writer.SetInputData(surfVTK)
+    writer.SetFileVersion(42) # This version is compatible with my version of MIRTK
     writer.Write()
 
     return
@@ -193,7 +194,7 @@ def split_surface_by_label(surfVTK,label=None,label_name="HemiLabels"):
                     cellPnts = np.array([pointIdMap[cellPnt == newPointIds] for cellPnt in cellPnts])
                     cellPntIds = vtk.vtkIdList()
                     for i in range(0, cellPnts.shape[0]):
-                            cellPntIds.InsertNextId(cellPnts[i])
+                        cellPntIds.InsertNextId(cellPnts[i,0])
                     thisSurf.InsertNextCell(5,cellPntIds)
                 else:
                     print("Found a boundary")
