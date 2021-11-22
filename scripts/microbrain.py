@@ -535,13 +535,13 @@ def main(argv):
         if diffusion_seg:
             mbrain_seg.segment(fmask, outputDir, subID, preproc_suffix, shell_suffix, bval_list, cpu_num=proc_num)
 
-        # Surface-based deformation cortical segmentation
-        if cort_seg:
-            src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
-            tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
-            os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
-            mbrain_cort.generate_surfaces_from_dwi(outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir)
-            os.system('rm -r ' + tmp_freesurf_subdir)
+        ## Surface-based deformation cortical segmentation
+        #if cort_seg:
+        #    src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
+        #    tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
+        #    os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
+        #    mbrain_cort.generate_surfaces_from_dwi(outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir)
+        #    os.system('rm -r ' + tmp_freesurf_subdir)
 
     print("Total time for processing: ", time() - total_t_start)
     print("")
