@@ -288,12 +288,13 @@ def register_prob_maps_ants(fsource, ftemplate, fmask, fgm, fwm, fcsf, fmni, fha
         ftemplate_mask = regDir + ftempbasename.replace('.nii.gz','_mask' + fsl_ext())
         system('fslmaths ' + ftemplate + ' -bin ' + ftemplate_mask)
         
-        system('antsRegistrationSyNQuick.sh' +
+        system('antsRegistrationSyN.sh' +
                 ' -d 3' +
                 ' -f ' + ftemplate + 
                 ' -m ' + fsource +
                 ' -o ' + ftransform_out +
-                ' -x ' + ftemplate_mask)
+                ' -x ' + ftemplate_mask +
+                ' -n 20 ')
 
         
         print('Warping probabilistic atlases to native space')
@@ -395,9 +396,9 @@ def initial_voxel_labels(subID, segDir, fharvard, md_file = None, md_thresh = 0.
         if sind == RIGHT_ACCUM_IDX or sind == LEFT_ACCUM_IDX:
             tmplabel[binary_erosion(harvard_data[:,:,:,sind] > 25)] = 1
         elif sind == RIGHT_HIPPOAMYG_IDX:
-            tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,RIGHT_HIPPO_IDX] > 60, harvard_data[:,:,:,RIGHT_AMYG_IDX] > 35))] = 1
+            tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,RIGHT_HIPPO_IDX] > 35, harvard_data[:,:,:,RIGHT_AMYG_IDX] > 35))] = 1
         elif sind == LEFT_HIPPOAMYG_IDX:
-            tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,LEFT_HIPPO_IDX] > 60, harvard_data[:,:,:,LEFT_AMYG_IDX] > 35))] = 1
+            tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,LEFT_HIPPO_IDX] > 35, harvard_data[:,:,:,LEFT_AMYG_IDX] > 35))] = 1
         elif sind == RIGHT_STRIATUM_IDX:
             tmplabel[binary_erosion(np.logical_or(np.logical_or(harvard_data[:,:,:,RIGHT_PUT_IDX] > 15, harvard_data[:,:,:,RIGHT_CAUDATE_IDX] > 15),harvard_data[:,:,:,RIGHT_ACCUM_IDX] > 15))] = 1
         elif sind == LEFT_STRIATUM_IDX:
@@ -425,7 +426,7 @@ def initial_voxel_labels(subID, segDir, fharvard, md_file = None, md_thresh = 0.
         os.system('mirtk extract-surface ' + finit_tmplabel + ' ' + finit_surf + ' -isovalue 0.5')
         os.system('mirtk extract-connected-points ' +
                   finit_surf + ' ' + finit_surf)
-        os.system('mirtk smooth-surface ' + finit_surf + ' ' + finit_surf + ' -iterations 50 -lambda 0.05')
+        os.system('mirtk smooth-surface ' + finit_surf + ' ' + finit_surf + ' -iterations 100 -lambda 0.05')
 
         # Label Surfaces
         os.system('mirtk project-onto-surface ' + finit_surf + ' ' +  finit_surf + ' -constant ' + str(sind) + ' -pointdata -name struct_label')
@@ -715,12 +716,12 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fgm_prob, fwm_prob, fcsf_
     #famyg_rh = segDir + subID + initial_seg_prefix + '_RIGHT_othing iterations. THAL_IDX, RIGHT_CORTEX_IDX, RIGHT_WHITE_IDX, RIGHT_THAL_IDX, BRAIN_STEM_IDX]
     hipamyg_prob_force = np.zeros(dwi_data.shape)
     hipamyg_pos_ind = [LEFT_CORTEX_IDX, LEFT_THAL_IDX, RIGHT_CORTEX_IDX, RIGHT_THAL_IDX, BRAIN_STEM_IDX]
-    #hipamyg_neg_ind = [LEFT_HIPPO_IDX, LEFT_AMYG_IDX, RIGHT_HIPPO_IDX, RIGHT_AMYG_IDX]
+    hipamyg_neg_ind = [LEFT_HIPPO_IDX, LEFT_AMYG_IDX, RIGHT_HIPPO_IDX, RIGHT_AMYG_IDX]
     for pos_ind in hipamyg_pos_ind:
         hipamyg_prob_force = hipamyg_prob_force + harvard_data[:,:,:,pos_ind]
 
-    #for neg_ind in hipamyg_neg_ind:
-    #    hipamyg_prob_force = hipamyg_prob_force - harvard_data[:,:,:,neg_ind]
+    for neg_ind in hipamyg_neg_ind:
+        hipamyg_prob_force = hipamyg_prob_force - 0*harvard_data[:,:,:,neg_ind]
 
     # Use previously calculated White probability rather than atlas probability that doesn't register well
     hipamyg_prob_force = hipamyg_prob_force + wm_prob*100
@@ -737,11 +738,11 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fgm_prob, fwm_prob, fcsf_
     print(upperbound)
 
     #if not os.path.exists(fhippoamyg_lh_refined):
-    os.system('mirtk deform-mesh ' + fhippoamyg_lh + ' ' + fhippoamyg_lh_refined + ' -image ' + fnegdwi + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 1 -distance-measure minimum -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength))
+    os.system('mirtk deform-mesh ' + fhippoamyg_lh + ' ' + fhippoamyg_lh_refined + ' -image ' + fnegdwi + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.01 -distance-smoothing 1 -distance-averaging 1 -distance-measure minimum -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength))
     surf_to_volume_mask(fdwi, fhippoamyg_lh_refined, 1, fhippoamyg_lh_refined.replace('.vtk',fsl_ext()))
 
     #if not os.path.exists(fhippoamyg_rh_refined):
-    os.system('mirtk deform-mesh ' + fhippoamyg_rh + ' ' + fhippoamyg_rh_refined + ' -image ' + fnegdwi + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging 1 -distance-measure minimum -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) +
+    os.system('mirtk deform-mesh ' + fhippoamyg_rh + ' ' + fhippoamyg_rh_refined + ' -image ' + fnegdwi + ' -edge-distance 1.0 -edge-distance-averaging 1 -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.01 -distance-smoothing 1 -distance-averaging 1 -distance-measure minimum -optimizer EulerMethod -step 0.2 -steps ' + str(step_num) +
               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength))
     surf_to_volume_mask(fdwi, fhippoamyg_rh_refined, 1, fhippoamyg_rh_refined.replace('.vtk',fsl_ext()))
    
@@ -1339,18 +1340,26 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
     segDir = subDir + '/subcortical_segmentation/'
     regDir = subDir + '/registration/'
 
-    ffa = subDir + '/DTI_maps/' + subID + '_' + preproc_suffix + '_' + shell_suffix + '_FA' + fsl_ext()
-    fmd = subDir + '/DTI_maps/' + subID + '_' + preproc_suffix + '_' + shell_suffix + '_MD' + fsl_ext()
-    fprim = subDir + '/DTI_maps/' + subID + '_' + preproc_suffix + '_' + shell_suffix + '_Primary_Direction' + fsl_ext()
+    if preproc_suffix == '':
+        suffix = '_' + shell_suffix
+    else:
+        suffix = '_' + preproc_suffix + '_' + shell_suffix
 
-    ffirstb0 = subDir + '/preprocessed/' + subID + '_' + preproc_suffix + '_firstb0' + fsl_ext()
-    fdiff = subDir + '/preprocessed/' + subID + '_' + preproc_suffix + fsl_ext()
+    ffa = subDir + '/DTI_maps/' + subID + suffix + '_FA' + fsl_ext()
+    fmd = subDir + '/DTI_maps/' + subID + suffix + '_MD' + fsl_ext()
+    fprim = subDir + '/DTI_maps/' + subID + suffix + '_Primary_Direction' + fsl_ext()
+
+    if preproc_suffix == '':
+        ffirstb0 = subDir + '/preprocessed/' + subID + '_firstb0' + fsl_ext()
+        fdiff = subDir + '/preprocessed/' + subID + fsl_ext()
+    else: 
+        ffirstb0 = subDir + '/preprocessed/' + subID + '_' + preproc_suffix + '_firstb0' + fsl_ext()
+        fdiff = subDir + '/preprocessed/' + subID + '_' + preproc_suffix + fsl_ext()
+   
     fbval =  subDir + '/orig/' + subID + '.bval'
     fbvec = subDir + '/orig/' + subID + '.bvec'
     bvals, bvecs = read_bvals_bvecs(fbval, fbvec)
     shells = [0,1000]
-    
-    ffirstb0 = subDir + '/preprocessed/' + subID + '_' + preproc_suffix + '_firstb0' + fsl_ext()
 
     # Register probability maps
     ftemplate =  os.environ['FSLDIR'] + '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
