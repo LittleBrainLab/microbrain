@@ -339,10 +339,12 @@ def register_prob_maps_ants(fsource, ftemplate, fmask, fgm, fwm, fcsf, fmni, fha
 
     return fgm_out, fwm_out, fcsf_out, fmni_out, fharvard_out
 
-def initial_voxel_labels(subID, segDir, fharvard):
+def initial_voxel_labels(subID, segDir, fharvard, md_file = None, md_thresh = 0.0015):
     if not os.path.exists(segDir):
         os.system('mkdir ' + segDir)
 
+    if md_file:
+        md_data = nib.load(md_file).get_data()
 
     finitlabels = segDir + subID + '_initialization' + fsl_ext()
 
@@ -393,9 +395,9 @@ def initial_voxel_labels(subID, segDir, fharvard):
         if sind == RIGHT_ACCUM_IDX or sind == LEFT_ACCUM_IDX:
             tmplabel[binary_erosion(harvard_data[:,:,:,sind] > 25)] = 1
         elif sind == RIGHT_HIPPOAMYG_IDX:
-            tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,RIGHT_HIPPO_IDX] > 35, harvard_data[:,:,:,RIGHT_AMYG_IDX] > 35))] = 1
+            tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,RIGHT_HIPPO_IDX] > 60, harvard_data[:,:,:,RIGHT_AMYG_IDX] > 35))] = 1
         elif sind == LEFT_HIPPOAMYG_IDX:
-            tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,LEFT_HIPPO_IDX] > 35, harvard_data[:,:,:,LEFT_AMYG_IDX] > 35))] = 1
+            tmplabel[binary_erosion(np.logical_or(harvard_data[:,:,:,LEFT_HIPPO_IDX] > 60, harvard_data[:,:,:,LEFT_AMYG_IDX] > 35))] = 1
         elif sind == RIGHT_STRIATUM_IDX:
             tmplabel[binary_erosion(np.logical_or(np.logical_or(harvard_data[:,:,:,RIGHT_PUT_IDX] > 15, harvard_data[:,:,:,RIGHT_CAUDATE_IDX] > 15),harvard_data[:,:,:,RIGHT_ACCUM_IDX] > 15))] = 1
         elif sind == LEFT_STRIATUM_IDX:
@@ -407,13 +409,26 @@ def initial_voxel_labels(subID, segDir, fharvard):
         else:
             tmplabel[binary_erosion(harvard_data[:,:,:,sind] > 50)] = 1
 
-        nib.save(nib.Nifti1Image(tmplabel, harvard_img.affine), finitlabels.replace(fsl_ext(),'_'+ slabel + fsl_ext()))
-        
+        # remove large MD voxels if argument provided
+        if md_file:
+            tmplabel[md_data > md_thresh] = 0
+
+        finit_tmplabel = finitlabels.replace(fsl_ext(),'_'+ slabel + fsl_ext())
+        nib.save(nib.Nifti1Image(tmplabel, harvard_img.affine), finit_tmplabel)
+        os.system('mirtk extract-connected-components ' +
+                  finit_tmplabel + ' ' + finit_tmplabel)
+        os.system('mirtk close-image ' + 
+                    finit_tmplabel + ' ' + finit_tmplabel + ' -iterations 2')
+
         # Extract surfaces
-        os.system('mirtk extract-surface ' + finitlabels.replace(fsl_ext(),'_'+ slabel + fsl_ext()) + ' ' + finitlabels.replace(fsl_ext(),'_'+ slabel + '.vtk') + ' -isovalue 0.5')
-       
+        finit_surf = finitlabels.replace(fsl_ext(), '_' + slabel + '.vtk')
+        os.system('mirtk extract-surface ' + finit_tmplabel + ' ' + finit_surf + ' -isovalue 0.5')
+        os.system('mirtk extract-connected-points ' +
+                  finit_surf + ' ' + finit_surf)
+        os.system('mirtk smooth-surface ' + finit_surf + ' ' + finit_surf + ' -iterations 50 -lambda 0.05')
+
         # Label Surfaces
-        os.system('mirtk project-onto-surface ' + finitlabels.replace(fsl_ext(),'_'+ slabel + '.vtk') + ' ' +  finitlabels.replace(fsl_ext(),'_'+ slabel + '.vtk') + ' -constant ' + str(sind) + ' -pointdata -name struct_label')
+        os.system('mirtk project-onto-surface ' + finit_surf + ' ' +  finit_surf + ' -constant ' + str(sind) + ' -pointdata -name struct_label')
 
         labels[tmplabel == 1] = sind
     
@@ -469,10 +484,7 @@ def surf_to_volume_mask(fdwi,fmesh,inside_val,fout):
     
     return 
 
-def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob, fcsf_prob, fharvard_native, segDir, subID, cpu_num=0):
-    #min_edgelength = 0.7
-    #max_edgelength = 1.2
-    
+def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fgm_prob, fwm_prob, fcsf_prob, fharvard_native, segDir, subID, cpu_num=0):
     min_edgelength = 0.75
     max_edgelength = 1.25
 
@@ -503,9 +515,6 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob, fcsf_prob, fhar
     curv_w = 4.0
     gcurv_w = 2.0
 
-    #caud_curv_w = 4.0
-    #caud_gcurv_w = 2.0
-
     step_num = 200
     
     initial_seg_prefix = '_initialization' 
@@ -529,6 +538,9 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob, fcsf_prob, fhar
     
     harvard_img = nib.load(fharvard_native)
     harvard_data = harvard_img.get_data()
+
+    gm_prob_img = nib.load(fgm_prob)
+    gm_prob = gm_prob_img.get_data()
 
     wm_prob_img = nib.load(fwm_prob)
     wm_prob = wm_prob_img.get_data()
@@ -700,19 +712,15 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob, fcsf_prob, fhar
 
     #famyg_lh = segDir + subID + initial_seg_prefix + '_LEFT_AMYGDALA.vtk'
     #famyg_lh_refined = famyg_lh.replace(initial_seg_prefix,seg_prefix)
-    #famyg_rh = segDir + subID + initial_seg_prefix + '_RIGHT_AMYGDALA.vtk'
-    #famyg_rh_refined = famyg_rh.replace(initial_seg_prefix,seg_prefix)
-    
-    # Probabilistic atlas based force for thalamus
+    #famyg_rh = segDir + subID + initial_seg_prefix + '_RIGHT_othing iterations. THAL_IDX, RIGHT_CORTEX_IDX, RIGHT_WHITE_IDX, RIGHT_THAL_IDX, BRAIN_STEM_IDX]
     hipamyg_prob_force = np.zeros(dwi_data.shape)
-    #hipamyg_pos_ind = [LEFT_CORTEX_IDX, LEFT_WHITE_IDX, LEFT_THAL_IDX, RIGHT_CORTEX_IDX, RIGHT_WHITE_IDX, RIGHT_THAL_IDX, BRAIN_STEM_IDX]
     hipamyg_pos_ind = [LEFT_CORTEX_IDX, LEFT_THAL_IDX, RIGHT_CORTEX_IDX, RIGHT_THAL_IDX, BRAIN_STEM_IDX]
-    hipamyg_neg_ind = [LEFT_HIPPO_IDX, LEFT_AMYG_IDX, RIGHT_HIPPO_IDX, RIGHT_AMYG_IDX]
+    #hipamyg_neg_ind = [LEFT_HIPPO_IDX, LEFT_AMYG_IDX, RIGHT_HIPPO_IDX, RIGHT_AMYG_IDX]
     for pos_ind in hipamyg_pos_ind:
         hipamyg_prob_force = hipamyg_prob_force + harvard_data[:,:,:,pos_ind]
 
-    for neg_ind in hipamyg_neg_ind:
-        hipamyg_prob_force = hipamyg_prob_force - harvard_data[:,:,:,neg_ind]
+    #for neg_ind in hipamyg_neg_ind:
+    #    hipamyg_prob_force = hipamyg_prob_force - harvard_data[:,:,:,neg_ind]
 
     # Use previously calculated White probability rather than atlas probability that doesn't register well
     hipamyg_prob_force = hipamyg_prob_force + wm_prob*100
@@ -1359,8 +1367,8 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
     fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
    
     # Perform subcortical segmentation
-    finit_labels = initial_voxel_labels(subID, segDir, fharvard_native)
-    deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fwm_prob_out, fcsf_prob_out, fharvard_native, segDir, subID, cpu_num=cpu_num)
+    finit_labels = initial_voxel_labels(subID, segDir, fharvard_native, md_file=fmd)
+    deform_subcortical_surfaces(fdwi, ffa, fmd, fprim, fgm_prob_out, fwm_prob_out, fcsf_prob_out, fharvard_native, segDir, subID, cpu_num=cpu_num)
 
     return
 
