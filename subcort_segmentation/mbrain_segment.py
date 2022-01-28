@@ -1,24 +1,18 @@
 #!/usr/local/bin/python
 import mbrain_preproc as mbrain_preproc
 import surf_util as sutil
-import itk
-from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
+
 import vtk
 from shutil import which
 
 import sys
 from os import system, environ, path
-from time import time
-import subprocess
 import numpy as np
 import nibabel as nib
 
-from skimage.morphology import binary_erosion, binary_dilation
-from dipy.align.reslice import reslice
-from dipy.io import read_bvals_bvecs
+from skimage.morphology import binary_erosion
 
 sys.path.append('../utils/')
-
 sys.path.append('../preprocessing/')
 
 # FSL Harvard Atlas label indices
