@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
-import mbrain_preproc as mbrain_preproc
-import surf_util as sutil
+import preprocessing.mbrain_preproc as mbrain_preproc
+import utils.surf_util as sutil
 
 import vtk
 from shutil import which
@@ -11,9 +11,6 @@ import numpy as np
 import nibabel as nib
 
 from skimage.morphology import binary_erosion
-
-sys.path.append('../utils/')
-sys.path.append('../preprocessing/')
 
 # FSL Harvard Atlas label indices
 LEFT_WHITE_IDX = 0

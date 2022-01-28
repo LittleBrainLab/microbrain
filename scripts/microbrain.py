@@ -1,32 +1,20 @@
 #!/usr/local/bin/python
-import mbrain_cortical_segmentation as mbrain_cort
-import mbrain_segment as mbrain_seg
-import mbrain_modelling as mbrain_modelling
-import mbrain_preproc as mbrain_preproc
-import os
-import sys
-import getopt
-import shutil
-import glob
-from os import system
-from os import path
-from time import time
-import subprocess
-
-import numpy as np
-import nibabel as nib
-
-from dipy.io import read_bvals_bvecs
-from dipy.core.gradients import gradient_table
 import dipy.reconst.dti as dti
-
-sys.path.append('../preprocessing/')
-
-sys.path.append('../modelling/')
-
-sys.path.append('../subcort_segmentation/')
-
-sys.path.append('../surfing/')
+from dipy.core.gradients import gradient_table
+from dipy.io import read_bvals_bvecs
+import nibabel as nib
+import numpy as np
+import subprocess
+from time import time
+from os import path
+from os import system
+import getopt
+import sys
+import os
+import microbrain.surfing.mbrain_cortical_segmentation as mbrain_cort
+import microbrain.subcort_segmentation.mbrain_segment as mbrain_seg
+import microbrain.modelling.mbrain_modelling as mbrain_modelling
+import microbrain.preprocessing.mbrain_preproc as mbrain_preproc
 
 
 def fsl_ext():

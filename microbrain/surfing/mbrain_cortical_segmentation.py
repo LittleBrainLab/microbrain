@@ -1,6 +1,6 @@
 import numpy as np
 import nibabel as nib
-import surf_util as sutil
+import utils.surf_util as sutil
 from time import time
 from nibabel.processing import smooth_image
 from dipy.align.reslice import reslice
