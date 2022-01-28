@@ -1,16 +1,13 @@
 #!/usr/local/bin/python
+import mbrain_preproc as mbrain_preproc
+import surf_util as sutil
 import itk
 from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 import vtk
 from shutil import which
-import mbrain_preproc as mbrain_preproc
-import surf_util as sutil
-import os
+
 import sys
-import shutil
-import glob
-from os import system
-from os import path
+from os import system, environ, path
 from time import time
 import subprocess
 import numpy as np
@@ -23,7 +20,6 @@ from dipy.io import read_bvals_bvecs
 sys.path.append('../utils/')
 
 sys.path.append('../preprocessing/')
-
 
 # FSL Harvard Atlas label indices
 LEFT_WHITE_IDX = 0
@@ -60,7 +56,6 @@ mirtk_cmd = 'mirtk'
 
 
 # Check to see if program is installed to path and executable before running subprocess
-# Ditto as below
 def is_tool(name):
     return which(name) is not None
 
@@ -69,9 +64,9 @@ def is_tool(name):
 
 def fsl_ext():
     fsl_extension = ''
-    if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
+    if environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
-    elif os.environ['FSLOUTPUTTYPE'] == 'NIFTI_GZ':
+    elif environ['FSLOUTPUTTYPE'] == 'NIFTI_GZ':
         fsl_extension = '.nii.gz'
     return fsl_extension
 
@@ -100,37 +95,36 @@ def vertex_PCA(A):
 # TODO: This should return a list of transformed files and be more general (probably should move to its own file)
 
 
-
 def register_prob_maps_ants(fsource, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir):
 
-    if not os.path.exists(regDir):
-        os.system('mkdir ' + regDir)
+    if not path.exists(regDir):
+        system('mkdir ' + regDir)
 
     method_suffix = '_ANTsReg_native'
-    ftempbasename = os.path.basename(ftemplate)
+    ftempbasename = path.basename(ftemplate)
     ftemplate_out = regDir + \
         ftempbasename.replace('.nii.gz', method_suffix + fsl_ext())
 
-    fgm_basename = os.path.basename(fgm)
+    fgm_basename = path.basename(fgm)
     fgm_out = regDir + fgm_basename.replace('.nii', method_suffix + fsl_ext())
 
-    fwm_basename = os.path.basename(fwm)
+    fwm_basename = path.basename(fwm)
     fwm_out = regDir + fwm_basename.replace('.nii', method_suffix + fsl_ext())
 
-    fcsf_basename = os.path.basename(fcsf)
+    fcsf_basename = path.basename(fcsf)
     fcsf_out = regDir + \
         fcsf_basename.replace('.nii', method_suffix + fsl_ext())
 
-    fmni_basename = os.path.basename(fmni)
+    fmni_basename = path.basename(fmni)
     fmni_out = regDir + \
         fmni_basename.replace('.nii.gz', method_suffix + fsl_ext())
 
-    fharvard_basename = os.path.basename(fharvard)
+    fharvard_basename = path.basename(fharvard)
     fharvard_out = regDir + \
         fharvard_basename.replace('.nii.gz', method_suffix + fsl_ext())
 
     ftransform_out = regDir + 'ants_native2mni_'
-    if not os.path.exists(fharvard_out):
+    if not path.exists(fharvard_out):
         print('Running Ants Registration')
 
         # Make template mask
@@ -194,8 +188,8 @@ def initial_voxel_labels(subID, segDir, fharvard, md_file=None, md_thresh=0.0015
 
     # Make output directory
     initSegDir = segDir + 'structure_initialization/'
-    if not os.path.exists(initSegDir):
-        os.system('mkdir ' + initSegDir)
+    if not path.exists(initSegDir):
+        system('mkdir ' + initSegDir)
 
     if md_file:
         md_data = nib.load(md_file).get_data()
@@ -278,21 +272,21 @@ def initial_voxel_labels(subID, segDir, fharvard, md_file=None, md_thresh=0.0015
 
         finit_tmplabel = finitlabels_prefix + '_' + slabel + fsl_ext()
         nib.save(nib.Nifti1Image(tmplabel, harvard_img.affine), finit_tmplabel)
-        os.system('mirtk extract-connected-components ' +
-                  finit_tmplabel + ' ' + finit_tmplabel)
+        system('mirtk extract-connected-components ' +
+               finit_tmplabel + ' ' + finit_tmplabel)
 
         # Extract surfaces
         finit_surf = finitlabels_prefix + '_' + slabel + '.vtk'
-        os.system('mirtk extract-surface ' + finit_tmplabel +
-                  ' ' + finit_surf + ' -isovalue 0.5')
-        os.system('mirtk extract-connected-points ' +
-                  finit_surf + ' ' + finit_surf)
-        os.system('mirtk smooth-surface ' + finit_surf + ' ' +
-                  finit_surf + ' -iterations 50 -lambda 0.05')
+        system('mirtk extract-surface ' + finit_tmplabel +
+               ' ' + finit_surf + ' -isovalue 0.5')
+        system('mirtk extract-connected-points ' +
+               finit_surf + ' ' + finit_surf)
+        system('mirtk smooth-surface ' + finit_surf + ' ' +
+               finit_surf + ' -iterations 50 -lambda 0.05')
 
         # Label Surfaces
-        os.system('mirtk project-onto-surface ' + finit_surf + ' ' + finit_surf +
-                  ' -constant ' + str(sind) + ' -pointdata -name struct_label')
+        system('mirtk project-onto-surface ' + finit_surf + ' ' + finit_surf +
+               ' -constant ' + str(sind) + ' -pointdata -name struct_label')
 
     # Combine left and right thalamus
     lh_thalamus = sutil.read_surf_vtk(
@@ -367,16 +361,16 @@ def extract_surfaces_from_labels(flabels, label_list, outDir, fout_prefix):
 
         # Extract surface around label
         fout_surf = fout_prefix + '_' + str(label_ind) + '.vtk'
-        os.system('mirtk extract-surface ' + ftmpNII +
-                  ' ' + fout_surf + ' -isovalue 0.5')
+        system('mirtk extract-surface ' + ftmpNII +
+               ' ' + fout_surf + ' -isovalue 0.5')
 
         # Smooth surface for the label
-        os.system('mirtk smooth-surface ' + fout_surf + ' ' +
-                  fout_surf + ' -iterations 50 -lambda 0.2')
+        system('mirtk smooth-surface ' + fout_surf + ' ' +
+               fout_surf + ' -iterations 50 -lambda 0.2')
 
         # Add label to surface mesh
-        os.system('mirtk project-onto-surface ' + fout_surf + ' ' + fout_surf +
-                  ' -constant ' + str(label_ind) + ' -pointdata -name struct_label')
+        system('mirtk project-onto-surface ' + fout_surf + ' ' + fout_surf +
+               ' -constant ' + str(label_ind) + ' -pointdata -name struct_label')
         fout_list = fout_list + [fout_surf]
 
     return fout_list
@@ -407,29 +401,29 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 
     # Make output folders
     MDFA_Dir = segDir + 'md_plus_fa_maps/'
-    if not os.path.exists(MDFA_Dir):
-        os.system('mkdir ' + MDFA_Dir)
+    if not path.exists(MDFA_Dir):
+        system('mkdir ' + MDFA_Dir)
 
     probForceDir = segDir + 'probability_force_maps/'
-    if not os.path.exists(probForceDir):
-        os.system('mkdir ' + probForceDir)
+    if not path.exists(probForceDir):
+        system('mkdir ' + probForceDir)
 
     meshDir = segDir + 'mesh_output/'
-    if not os.path.exists(meshDir):
-        os.system('mkdir ' + meshDir)
+    if not path.exists(meshDir):
+        system('mkdir ' + meshDir)
 
     voxelDir = segDir + 'voxel_output/'
-    if not os.path.exists(voxelDir):
-        os.system('mkdir ' + voxelDir)
+    if not path.exists(voxelDir):
+        system('mkdir ' + voxelDir)
 
     atroposDir = segDir + 'atropos_hippoamyg_seg/'
-    if not os.path.exists(atroposDir):
-        os.system('mkdir ' + atroposDir)
+    if not path.exists(atroposDir):
+        system('mkdir ' + atroposDir)
 
     # Make composite map of FA + csf probabilities. (This map defines the borders of the caudate and the thalamus)
     fmd_plusFA = MDFA_Dir + \
-        os.path.basename(fmd.replace(fsl_ext(), '_plusFA' + fsl_ext()))
-    os.system('fslmaths ' + fmd + ' -mul 1000 -add ' + ffa + ' ' + fmd_plusFA)
+        path.basename(fmd.replace(fsl_ext(), '_plusFA' + fsl_ext()))
+    system('fslmaths ' + fmd + ' -mul 1000 -add ' + ffa + ' ' + fmd_plusFA)
     MD_plusFA_data = nib.load(fmd_plusFA).get_data()
 
     fa_img = nib.load(ffa)
@@ -457,17 +451,17 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
     # Deform globus pallidus based on meanDWI and resticting movement into high FA regions
     fglobus_lh = initSegDir + subID + initial_seg_prefix + '_LEFT_GLOBUS.vtk'
     fglobus_lh_refined = meshDir + subID + seg_prefix + '_LEFT_GLOBUS.vtk'
-    if not os.path.exists(fglobus_lh_refined):
-        os.system('mirtk deform-mesh ' + fglobus_lh + ' ' + fglobus_lh_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglob_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(
+    if not path.exists(fglobus_lh_refined):
+        system('mirtk deform-mesh ' + fglobus_lh + ' ' + fglobus_lh_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglob_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(
             step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
         surf_to_volume_mask(fdwi, fglobus_lh_refined, 1,
                             voxelDir + subID + seg_prefix + '_LEFT_GLOBUS' + fsl_ext())
 
     fglobus_rh = initSegDir + subID + initial_seg_prefix + '_RIGHT_GLOBUS.vtk'
     fglobus_rh_refined = meshDir + subID + seg_prefix + '_RIGHT_GLOBUS.vtk'
-    if not os.path.exists(fglobus_rh_refined):
-        os.system('mirtk deform-mesh ' + fglobus_rh + ' ' + fglobus_rh_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglob_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
+    if not path.exists(fglobus_rh_refined):
+        system('mirtk deform-mesh ' + fglobus_rh + ' ' + fglobus_rh_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglob_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
         surf_to_volume_mask(fdwi, fglobus_rh_refined, 1,
                             voxelDir + subID + seg_prefix + '_RIGHT_GLOBUS' + fsl_ext())
 
@@ -482,8 +476,8 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
     fa_globus[lh_globus_data == 1] = 2
     fa_globus[rh_globus_data == 1] = 2
     fmd_plusFA_globus = MDFA_Dir + \
-        os.path.basename(fmd_plusFA.replace(fsl_ext(), '_globus' + fsl_ext()))
-    if not os.path.exists(fmd_plusFA_globus):
+        path.basename(fmd_plusFA.replace(fsl_ext(), '_globus' + fsl_ext()))
+    if not path.exists(fmd_plusFA_globus):
         nib.save(nib.Nifti1Image(fa_globus, fa_img.affine), fmd_plusFA_globus)
 
     # Probabilistic atlas based force for striatum
@@ -501,23 +495,23 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
             harvard_data[:, :, :, neg_ind]
 
     fstriatum_prob_force = probForceDir + subID + '_striatum_prob_force' + fsl_ext()
-    if not os.path.exists(fstriatum_prob_force):
+    if not path.exists(fstriatum_prob_force):
         nib.save(nib.Nifti1Image(striatum_prob_force,
                                  fa_img.affine), fstriatum_prob_force)
 
     fstriatum_lh = initSegDir + subID + initial_seg_prefix + '_LEFT_STRIATUM.vtk'
     fstriatum_lh_refined = meshDir + subID + seg_prefix + '_LEFT_STRIATUM.vtk'
-    if not os.path.exists(fstriatum_lh_refined):
-        os.system('mirtk deform-mesh ' + fstriatum_lh + ' ' + fstriatum_lh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1  -distance-image ' + fstriatum_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.3')
+    if not path.exists(fstriatum_lh_refined):
+        system('mirtk deform-mesh ' + fstriatum_lh + ' ' + fstriatum_lh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1  -distance-image ' + fstriatum_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.3')
         surf_to_volume_mask(fdwi, fstriatum_lh_refined, 1,
                             voxelDir + subID + seg_prefix + '_LEFT_STRIATUM' + fsl_ext())
 
     fstriatum_rh = initSegDir + subID + initial_seg_prefix + '_RIGHT_STRIATUM.vtk'
     fstriatum_rh_refined = meshDir + subID + seg_prefix + '_RIGHT_STRIATUM.vtk'
-    if not os.path.exists(fstriatum_rh_refined):
-        os.system('mirtk deform-mesh ' + fstriatum_rh + ' ' + fstriatum_rh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1  -distance-image ' + fstriatum_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.3')
+    if not path.exists(fstriatum_rh_refined):
+        system('mirtk deform-mesh ' + fstriatum_rh + ' ' + fstriatum_rh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1  -distance-image ' + fstriatum_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.3')
         surf_to_volume_mask(fdwi, fstriatum_rh_refined, 1,
                             voxelDir + subID + seg_prefix + '_RIGHT_STRIATUM' + fsl_ext())
 
@@ -531,10 +525,10 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
     fa_md_striatum[lh_striatum_data == 1] = 2
     fa_md_striatum[rh_striatum_data == 1] = 2
     fmd_plusFA_striatum = MDFA_Dir + \
-        os.path.basename(fmd_plusFA.replace(
+        path.basename(fmd_plusFA.replace(
             fsl_ext(), '_striatum' + fsl_ext()))
 
-    if not os.path.exists(fmd_plusFA_striatum):
+    if not path.exists(fmd_plusFA_striatum):
         nib.save(nib.Nifti1Image(fa_md_striatum,
                  fa_img.affine), fmd_plusFA_striatum)
 
@@ -550,28 +544,28 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         thal_prob_force = thal_prob_force - harvard_data[:, :, :, neg_ind]
 
     fthal_prob_force = probForceDir + subID + '_thalamus_prob_force' + fsl_ext()
-    if not os.path.exists(fthal_prob_force):
+    if not path.exists(fthal_prob_force):
         nib.save(nib.Nifti1Image(thal_prob_force,
                  fa_img.affine), fthal_prob_force)
 
     fthalamus = initSegDir + subID + initial_seg_prefix + '_THALAMUS.vtk'
     fthalamus_refined = meshDir + subID + seg_prefix + '_THALAMUS.vtk'
-    if not os.path.exists(fthalamus_refined):
-        os.system('mirtk deform-mesh ' + fthalamus + ' ' + fthalamus_refined + ' -image ' + fmd_plusFA_striatum + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fthal_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 1.25')
+    if not path.exists(fthalamus_refined):
+        system('mirtk deform-mesh ' + fthalamus + ' ' + fthalamus_refined + ' -image ' + fmd_plusFA_striatum + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fthal_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 1.25')
 
     thalamus_surf = sutil.read_surf_vtk(fthalamus_refined)
     [lh_thalamus, rh_thalamus] = sutil.split_surface_by_label(
         thalamus_surf, label=[LEFT_THAL_IDX, RIGHT_THAL_IDX], label_name='struct_label')
 
     fthalamus_lh_refined = meshDir + subID + seg_prefix + '_LEFT_THALAMUS.vtk'
-    if not os.path.exists(fthalamus_lh_refined):
+    if not path.exists(fthalamus_lh_refined):
         sutil.write_surf_vtk(lh_thalamus, fthalamus_lh_refined)
         surf_to_volume_mask(fdwi, fthalamus_lh_refined, 1,
                             voxelDir + subID + seg_prefix + '_LEFT_THALAMUS' + fsl_ext())
 
     fthalamus_rh_refined = meshDir + subID + seg_prefix + '_RIGHT_THALAMUS.vtk'
-    if not os.path.exists(fthalamus_rh_refined):
+    if not path.exists(fthalamus_rh_refined):
         sutil.write_surf_vtk(rh_thalamus, fthalamus_rh_refined)
         surf_to_volume_mask(fdwi, fthalamus_rh_refined, 1,
                             voxelDir + subID + seg_prefix + '_RIGHT_THALAMUS' + fsl_ext())
@@ -596,17 +590,17 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 
     fhippoamyg_lh = initSegDir + subID + initial_seg_prefix + '_LEFT_HIPPOAMYG.vtk'
     fhippoamyg_lh_refined = atroposDir + subID + seg_prefix + '_LEFT_HIPPOAMYG.vtk'
-    if not os.path.exists(fhippoamyg_lh_refined):
-        os.system('mirtk deform-mesh ' + fhippoamyg_lh + ' ' + fhippoamyg_lh_refined + ' -image ' + fmd_plusFA + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
+    if not path.exists(fhippoamyg_lh_refined):
+        system('mirtk deform-mesh ' + fhippoamyg_lh + ' ' + fhippoamyg_lh_refined + ' -image ' + fmd_plusFA + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
         surf_to_volume_mask(fdwi, fhippoamyg_lh_refined, 1,
                             atroposDir + subID + seg_prefix + '_LEFT_HIPPOAMYG' + fsl_ext())
 
     fhippoamyg_rh = initSegDir + subID + initial_seg_prefix + '_RIGHT_HIPPOAMYG.vtk'
     fhippoamyg_rh_refined = atroposDir + subID + seg_prefix + '_RIGHT_HIPPOAMYG.vtk'
-    if not os.path.exists(fhippoamyg_rh_refined):
-        os.system('mirtk deform-mesh ' + fhippoamyg_rh + ' ' + fhippoamyg_rh_refined + ' -image ' + fmd_plusFA + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
+    if not path.exists(fhippoamyg_rh_refined):
+        system('mirtk deform-mesh ' + fhippoamyg_rh + ' ' + fhippoamyg_rh_refined + ' -image ' + fmd_plusFA + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
         surf_to_volume_mask(fdwi, fhippoamyg_rh_refined, 1,
                             atroposDir + subID + seg_prefix + '_RIGHT_HIPPOAMYG' + fsl_ext())
 
@@ -620,17 +614,17 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         initial_seg_prefix + '_INITAMYGHIPPO_LH_PROBOUT_'
 
     famyg_lh_prob = atropos_prefix_lh + '_01' + fsl_ext()
-    if not os.path.exists(famyg_lh_prob):
+    if not path.exists(famyg_lh_prob):
         nib.save(nib.Nifti1Image(
             harvard_data[:, :, :, LEFT_AMYG_IDX]/100, harvard_img.affine), famyg_lh_prob)
 
     fhippo_lh_prob = atropos_prefix_lh + '_02' + fsl_ext()
-    if not os.path.exists(fhippo_lh_prob):
+    if not path.exists(fhippo_lh_prob):
         nib.save(nib.Nifti1Image(
             harvard_data[:, :, :, LEFT_HIPPO_IDX]/100, harvard_img.affine), fhippo_lh_prob)
 
     fcortex_lh_prob = atropos_prefix_lh + '_03' + fsl_ext()
-    if not os.path.exists(fcortex_lh_prob):
+    if not path.exists(fcortex_lh_prob):
         nib.save(nib.Nifti1Image(
             harvard_data[:, :, :, LEFT_CORTEX_IDX]/100, harvard_img.affine), fcortex_lh_prob)
 
@@ -642,22 +636,22 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         initial_seg_prefix + '_INITAMYGHIPPO_RH_PROBOUT_'
 
     famyg_rh_prob = atropos_prefix_rh + '_01' + fsl_ext()
-    if not os.path.exists(famyg_rh_prob):
+    if not path.exists(famyg_rh_prob):
         nib.save(nib.Nifti1Image(
             harvard_data[:, :, :, RIGHT_AMYG_IDX]/100, harvard_img.affine), famyg_rh_prob)
 
     fhippo_rh_prob = atropos_prefix_rh + '_02' + fsl_ext()
-    if not os.path.exists(fhippo_rh_prob):
+    if not path.exists(fhippo_rh_prob):
         nib.save(nib.Nifti1Image(
             harvard_data[:, :, :, RIGHT_HIPPO_IDX]/100, harvard_img.affine), fhippo_rh_prob)
 
     fcortex_rh_prob = atropos_prefix_rh + '_03' + fsl_ext()
-    if not os.path.exists(fcortex_rh_prob):
+    if not path.exists(fcortex_rh_prob):
         nib.save(nib.Nifti1Image(
             harvard_data[:, :, :, RIGHT_CORTEX_IDX]/100, harvard_img.affine), fcortex_rh_prob)
 
     PriorWeight = 0.3
-    if not os.path.exists(atropos_prefix_lh_label):
+    if not path.exists(atropos_prefix_lh_label):
         system('Atropos' +
                ' -a [' + fmd_plusFA + ']' +
                ' -x ' + atr, VP at Ubisoft’s Strategic Innovations Lab aoposDir + subID + seg_prefix + '_LEFT_HIPPOAMYG' + fsl_ext() +
@@ -669,7 +663,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
                ' -k HistogramParzenWindows[1.0,32]' +
                ' -v 1')
 
-    if not os.path.exists(atropos_prefix_rh_label):
+    if not path.exists(atropos_prefix_rh_label):
         system('Atropos' +
                ' -a [' + fmd_plusFA + ']' +
                ' -x ' + atroposDir + subID + seg_prefix + '_RIGHT_HIPPOAMYG' + fsl_ext() +
@@ -726,27 +720,27 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
     fa_md_hippocortex[rh_labels == 3] = 2
 
     fmd_plusFA_hippocortex = MDFA_Dir + \
-        os.path.basename(fmd_plusFA.replace(
+        path.basename(fmd_plusFA.replace(
             fsl_ext(), '_hippocortex' + fsl_ext()))
-    if not os.path.exists(fmd_plusFA_hippocortex):
+    if not path.exists(fmd_plusFA_hippocortex):
         nib.save(nib.Nifti1Image(fa_md_hippocortex,
                  fa_img.affine), fmd_plusFA_hippocortex)
 
     famyg_lh_refined = meshDir + subID + seg_prefix + '_LEFT_AMYGDALA.vtk'
-    if not os.path.exists(famyg_lh_refined):
-        os.system('mirtk deform-mesh ' + famyg_lh_step1 + ' ' + famyg_lh_refined + ' -image ' + fmd_plusFA_hippocortex + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + famyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
-        os.system('mirtk project-onto-surface ' + famyg_lh_refined + ' ' + famyg_lh_refined +
-                  ' -constant ' + str(LEFT_AMYG_IDX) + ' -pointdata -name struct_label')
+    if not path.exists(famyg_lh_refined):
+        system('mirtk deform-mesh ' + famyg_lh_step1 + ' ' + famyg_lh_refined + ' -image ' + fmd_plusFA_hippocortex + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + famyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
+        system('mirtk project-onto-surface ' + famyg_lh_refined + ' ' + famyg_lh_refined +
+               ' -constant ' + str(LEFT_AMYG_IDX) + ' -pointdata -name struct_label')
         surf_to_volume_mask(fdwi, famyg_lh_refined, 1,
                             voxelDir + subID + seg_prefix + '_LEFT_AMYGDALA' + fsl_ext())
 
     famyg_rh_refined = meshDir + subID + seg_prefix + '_RIGHT_AMYGDALA.vtk'
-    if not os.path.exists(famyg_rh_refined):
-        os.system('mirtk deform-mesh ' + famyg_rh_step1 + ' ' + famyg_rh_refined + ' -image ' + fmd_plusFA_hippocortex + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + famyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
-        os.system('mirtk project-onto-surface ' + famyg_rh_refined + ' ' + famyg_rh_refined +
-                  ' -constant ' + str(RIGHT_AMYG_IDX) + ' -pointdata -name struct_label')
+    if not path.exists(famyg_rh_refined):
+        system('mirtk deform-mesh ' + famyg_rh_step1 + ' ' + famyg_rh_refined + ' -image ' + fmd_plusFA_hippocortex + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + famyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
+        system('mirtk project-onto-surface ' + famyg_rh_refined + ' ' + famyg_rh_refined +
+               ' -constant ' + str(RIGHT_AMYG_IDX) + ' -pointdata -name struct_label')
         surf_to_volume_mask(fdwi, famyg_rh_refined, 1,
                             voxelDir + subID + seg_prefix + '_RIGHT_AMYGDALA' + fsl_ext())
 
@@ -777,33 +771,33 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
     fa_md_amyg[rh_labels == 3] = 2
 
     fmd_plusFA_amyg = MDFA_Dir + \
-        os.path.basename(fmd_plusFA.replace(
+        path.basename(fmd_plusFA.replace(
             fsl_ext(), '_amyg' + fsl_ext()))
-    if not os.path.exists(fmd_plusFA_amyg):
+    if not path.exists(fmd_plusFA_amyg):
         nib.save(nib.Nifti1Image(fa_md_amyg,
                  fa_img.affine), fmd_plusFA_amyg)
 
     fhippo_lh_refined = meshDir + subID + seg_prefix + '_LEFT_HIPPO.vtk'
-    if not os.path.exists(fhippo_lh_refined):
-        os.system('mirtk deform-mesh ' + fhippo_lh_step1 + ' ' + fhippo_lh_refined + ' -image ' + fmd_plusFA_amyg + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
-        os.system('mirtk project-onto-surface ' + fhippo_lh_refined + ' ' + fhippo_lh_refined +
-                  ' -constant ' + str(LEFT_HIPPO_IDX) + ' -pointdata -name struct_label')
+    if not path.exists(fhippo_lh_refined):
+        system('mirtk deform-mesh ' + fhippo_lh_step1 + ' ' + fhippo_lh_refined + ' -image ' + fmd_plusFA_amyg + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
+        system('mirtk project-onto-surface ' + fhippo_lh_refined + ' ' + fhippo_lh_refined +
+               ' -constant ' + str(LEFT_HIPPO_IDX) + ' -pointdata -name struct_label')
         surf_to_volume_mask(fdwi, fhippo_lh_refined, 1,
                             voxelDir + subID + seg_prefix + '_LEFT_HIPPO' + fsl_ext())
 
     fhippo_rh_refined = meshDir + subID + seg_prefix + '_RIGHT_HIPPO.vtk'
-    if not os.path.exists(fhippo_rh_refined):
-        os.system('mirtk deform-mesh ' + fhippo_rh_step1 + ' ' + fhippo_rh_refined + ' -image ' + fmd_plusFA_amyg + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
-                  ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
-        os.system('mirtk project-onto-surface ' + fhippo_rh_refined + ' ' + fhippo_rh_refined +
-                  ' -constant ' + str(RIGHT_HIPPO_IDX) + ' -pointdata -name struct_label')
+    if not path.exists(fhippo_rh_refined):
+        system('mirtk deform-mesh ' + fhippo_rh_step1 + ' ' + fhippo_rh_refined + ' -image ' + fmd_plusFA_amyg + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhippo_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
+               ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
+        system('mirtk project-onto-surface ' + fhippo_rh_refined + ' ' + fhippo_rh_refined +
+               ' -constant ' + str(RIGHT_HIPPO_IDX) + ' -pointdata -name struct_label')
         surf_to_volume_mask(fdwi, fhippo_rh_refined, 1,
                             voxelDir + subID + seg_prefix + '_RIGHT_HIPPO' + fsl_ext())
 
     # Append subcort surfs together into single vtk file
     fsubcortseg_vtk = meshDir + subID + seg_prefix + '_subcortGM.vtk'
-    if not os.path.exists(fsubcortseg_vtk):
+    if not path.exists(fsubcortseg_vtk):
         appender = vtk.vtkAppendPolyData()
         appender.AddInputData(sutil.read_surf_vtk(fglobus_lh_refined))
         appender.AddInputData(sutil.read_surf_vtk(fglobus_rh_refined))
@@ -826,7 +820,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 # def prepare_prob_maps_for_segmentation(fgm, fwm, fcsf, fmni, fharvard, regDir, tissue_base_prior, csf_vent_prior, cerebel_cereb_prior, cerebel_cereb_bs_prior):
 #
 #    first_tissue_prior_fname = regDir + tissue_base_prior + str(1).zfill(2) + fsl_ext()
-#    if not os.path.exists(first_tissue_prior_fname):
+#    if not path.exists(first_tissue_prior_fname):
 #        gm_img = nib.load(fgm)
 #        gm_data = gm_img.get_data()*100
 #
@@ -895,23 +889,23 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #    tissue_nclasses = 3
 #
 #    fmd_plusFA = fmd.replace(fsl_ext(),'_plusFA' + fsl_ext())
-#    os.system('fslmaths ' + fmd + ' -mul 1000 -add ' + ffa + ' ' + fmd_plusFA)
+#    system('fslmaths ' + fmd + ' -mul 1000 -add ' + ffa + ' ' + fmd_plusFA)
 #
 #    fmd_mul = fmd.replace(fsl_ext(),'_scale1000' + fsl_ext())
-#    os.system('fslmaths ' + fmd + ' -mul 1000 ' + fmd_mul)
+#    system('fslmaths ' + fmd + ' -mul 1000 ' + fmd_mul)
 #
 #    print("Starting Tissue Segmentation")
-#    if not os.path.exists(segDir):
-#            os.system('mkdir ' + segDir)
+#    if not path.exists(segDir):
+#            system('mkdir ' + segDir)
 #
 #    tissue_base_name = segDir + 'tissue_prob_' + tissue_prob_suffix + '_'
 #    ftissuelabels = tissue_base_name + 'out_seg' + fsl_ext()
 #    ftissueprobs_base = tissue_base_name + 'out_prob_'
-#    if not os.path.exists(ftissuelabels):
+#    if not path.exists(ftissuelabels):
 #        # Copy tissue probability maps to base tissue fname
 #        fprob_list = [fgm_native, fwm_native, fcsf_native]
 #        for i in range(0,tissue_nclasses):
-#            os.system('cp ' + fprob_list[i] + ' ' + tissue_base_name + str(i+1).zfill(2) + fsl_ext())
+#            system('cp ' + fprob_list[i] + ' ' + tissue_base_name + str(i+1).zfill(2) + fsl_ext())
 #            process = subprocess.run(['fslcpgeom', fdwi, tissue_base_name + str(i+1).zfill(2) + fsl_ext()], stdout=subprocess.PIPE, universal_newlines=True)
 #
 #        process = subprocess.run(['fslcpgeom', fdwi, ffa], stdout=subprocess.PIPE, universal_newlines=True)
@@ -929,7 +923,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #
 #        # remove files used for input to Atropos
 #        for i in range(0,tissue_nclasses):
-#            os.system('rm ' + tissue_base_name + str(i+1).zfill(2) + fsl_ext())
+#            system('rm ' + tissue_base_name + str(i+1).zfill(2) + fsl_ext())
 #    else:
 #        print("Tissue segmentation already completed")
 #
@@ -946,14 +940,14 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #    print("N4 correction (ANTS)")
 #    t = time()
 #
-#    if not os.path.exists(segDir):
-#        os.system('mkdir ' + segDir)
+#    if not path.exists(segDir):
+#        system('mkdir ' + segDir)
 #
-#    finput_basename = os.path.basename(finput)
+#    finput_basename = path.basename(finput)
 #    fn4correct = segDir + finput_basename.replace(fsl_ext(), '_n4_' + itr_str + fsl_ext())
 #    fbias = segDir + finput_basename.replace(fsl_ext(), '_n4bias_' + itr_str + fsl_ext())
 #
-#    if not os.path.exists(fn4correct):
+#    if not path.exists(fn4correct):
 #        if is_tool('N4BiasFieldCorrection'):
 #                process = subprocess.run(['fslcpgeom', finput, fmask], stdout=subprocess.PIPE, universal_newlines=True)
 #                n4command = ['N4BiasFieldCorrection',
@@ -981,7 +975,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #        return_code = 0
 #
 #
-#    fdiff_basename = os.path.basename(fdiff)
+#    fdiff_basename = path.basename(fdiff)
 #
 #    for shell in shells:
 #        fmeanshell_n4 = segDir + fdiff_basename.replace(fsl_ext(),'_mean_b' + str(shell) + '_n4_' + itr_str + fsl_ext())
@@ -991,7 +985,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #        if shell == shells[1]:
 #            fdwi_n4 = fmeanshell_n4
 #
-#        if not os.path.exists(fmeanshell_n4):
+#        if not path.exists(fmeanshell_n4):
 #            diff_img = nib.load(fdiff)
 #            diff_data = diff_img.get_data()
 #
@@ -1015,8 +1009,8 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #    fgm_prob_final = tissueDir + 'tissue_prob_final_out_prob_GM' + fsl_ext()
 #    fwm_prob_final = tissueDir + 'tissue_prob_final_out_prob_WM' + fsl_ext()
 #    fcsf_prob_final = tissueDir + 'tissue_prob_final_out_prob_CSF' + fsl_ext()
-#    fdwi_final = tissueDir + os.path.basename(fdiff).replace(fsl_ext(), '_mean_b1000_n4_final' + fsl_ext())
-#    if not os.path.exists(fseg_final):
+#    fdwi_final = tissueDir + path.basename(fdiff).replace(fsl_ext(), '_mean_b1000_n4_final' + fsl_ext())
+#    if not path.exists(fseg_final):
 #        # initial n4 correction
 #        fn4_out, fbias_out, fb0avg_out, fdwi_out = N4_correction(ffirstb0, fmask, fwm_native, fdiff, bvals, shells, 'init', tissueDir)
 #
@@ -1039,14 +1033,14 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #        fwm_prob_final = fwm_prob_out.replace('refined', 'final').replace('02' + fsl_ext(), 'WM' + fsl_ext())
 #        fcsf_prob_final = fcsf_prob_out.replace('refined', 'final').replace('03' + fsl_ext(), 'CSF' + fsl_ext())
 #
-#        os.system('mv ' + fn4_out + ' ' + fn4_final)
-#        os.system('mv ' + fbias_out + ' ' + fbias_final)
-#        os.system('mv ' + fb0avg_out + ' ' + fb0avg_final)
-#        os.system('mv ' + fdwi_out + ' ' + fdwi_final)
-#        os.system('mv ' + fseg_out + ' ' + fseg_final)
-#        os.system('mv ' + fgm_prob_out + ' ' + fgm_prob_final)
-#        os.system('mv ' + fwm_prob_out + ' ' + fwm_prob_final)
-#        os.system('mv ' + fcsf_prob_out + ' ' + fcsf_prob_final)
+#        system('mv ' + fn4_out + ' ' + fn4_final)
+#        system('mv ' + fbias_out + ' ' + fbias_final)
+#        system('mv ' + fb0avg_out + ' ' + fb0avg_final)
+#        system('mv ' + fdwi_out + ' ' + fdwi_final)
+#        system('mv ' + fseg_out + ' ' + fseg_final)
+#        system('mv ' + fgm_prob_out + ' ' + fgm_prob_final)
+#        system('mv ' + fwm_prob_out + ' ' + fwm_prob_final)
+#        system('mv ' + fcsf_prob_out + ' ' + fcsf_prob_final)
 #    else:
 #        print("Iterative Tissue Classification previously done: Skipping")
 #
@@ -1068,15 +1062,15 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
     fmd = subDir + '/DTI_maps/' + subID + suffix + '_MD' + fsl_ext()
 
     # Register probability maps
-    ftemplate = os.environ['FSLDIR'] + \
+    ftemplate = environ['FSLDIR'] + \
         '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
 
     fgm = '../Data/tissuepriors/avg152T1_gm_resampled.nii'
     fwm = '../Data/tissuepriors/avg152T1_wm_resampled.nii'
     fcsf = '../Data/tissuepriors/avg152T1_csf_resampled.nii'
 
-    fmni = os.environ['FSLDIR'] + '/data/atlases/MNI/MNI-prob-1mm.nii.gz'
-    fharvard = os.environ['FSLDIR'] + \
+    fmni = environ['FSLDIR'] + '/data/atlases/MNI/MNI-prob-1mm.nii.gz'
+    fharvard = environ['FSLDIR'] + \
         '/data/atlases/HarvardOxford/HarvardOxford-sub-prob-1mm.nii.gz'
     fgm_native, fwm_native, fcsf_native, fmni_native, fharvard_native = register_prob_maps_ants(
         ffa, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir)
@@ -1085,8 +1079,8 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
     #fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
 
     # Perform subcortical segmentation
-    if not os.path.exists(segDir):
-        os.system('mkdir ' + segDir)
+    if not path.exists(segDir):
+        system('mkdir ' + segDir)
     initSegDir = initial_voxel_labels(
         subID, segDir, fharvard_native, md_file=fmd, fa_file=ffa)
 
