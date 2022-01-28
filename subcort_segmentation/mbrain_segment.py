@@ -39,24 +39,43 @@ RIGHT_HIPPO_IDX = 18
 RIGHT_AMYG_IDX = 19
 RIGHT_ACCUM_IDX = 20
 
-# Combined indices for MicroBrain
+# indices specific for MicroBrain ROIs
 LEFT_HIPPOAMYG_IDX = 88
 LEFT_STRIATUM_IDX = 66
 RIGHT_HIPPOAMYG_IDX = 188
 RIGHT_STRIATUM_IDX = 166
 
-# mirtk docker command
-mirtk_cmd = 'mirtk'
 
-
-# Check to see if program is installed to path and executable before running subprocess
+# move these functions to mbrain_io.py
 def is_tool(name):
-    return which(name) is not None
+    """
+    Checks to see if third party binary is installed and accessible by command line
 
-# Define this as a common util (I think I need a mbrain_io.py)
+    Parameters
+    ----------
+    name: the name of the command to look for
+
+    Returns
+    -------
+    Boolean: true if command exists, false if not in path
+    """
+
+    return which(name) is not None
 
 
 def fsl_ext():
+    """
+    Gets the preferred image extension used by FSL
+
+    Parameters
+    ----------
+    none
+
+    Returns
+    -------
+    extension: a string containing the preferred output
+    """
+
     fsl_extension = ''
     if environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -64,33 +83,23 @@ def fsl_ext():
         fsl_extension = '.nii.gz'
     return fsl_extension
 
-# Legacy (originally used to segment hippo/amygdala) Move/delete this
 
+def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir):
+    """
+    Given an image will register this image to the template (ANTs SyN)
+    Then applies this transform to an atlas
 
-def vertex_PCA(A):
-    # define a matrix
-    # calculate the mean of each column
-    M = np.mean(A.T, axis=1)
+    Parameters
+    ----------
+    fsource: image in native space
+    ftemplate: image template in MNI space (or normal space)
+    fatlas: 4D nifti file in MNI space to be registered
+    regDir: Directory to store outpu
 
-    # center columns by subtracting column means
-    C = A - M
-
-    # calculate covariance matrix of centered matrix
-    V = np.cov(C.T)
-
-    # eigendecomposition of covariance matrix
-    values, vectors = np.linalg.eig(V)
-
-    # project data
-    proj_A = vectors.T.dot(C.T)
-
-    return values, vectors, proj_A
-
-# TODO: This should return a list of transformed files and be more general (probably should move to its own file)
-
-
-def register_prob_maps_ants(fsource, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir):
-
+    Returns
+    -------
+    fatlas_out: filename for atlas registered to native space
+    """
     if not path.exists(regDir):
         system('mkdir ' + regDir)
 
@@ -99,83 +108,42 @@ def register_prob_maps_ants(fsource, ftemplate, fmask, fgm, fwm, fcsf, fmni, fha
     ftemplate_out = regDir + \
         ftempbasename.replace('.nii.gz', method_suffix + fsl_ext())
 
-    fgm_basename = path.basename(fgm)
-    fgm_out = regDir + fgm_basename.replace('.nii', method_suffix + fsl_ext())
-
-    fwm_basename = path.basename(fwm)
-    fwm_out = regDir + fwm_basename.replace('.nii', method_suffix + fsl_ext())
-
-    fcsf_basename = path.basename(fcsf)
-    fcsf_out = regDir + \
-        fcsf_basename.replace('.nii', method_suffix + fsl_ext())
-
-    fmni_basename = path.basename(fmni)
-    fmni_out = regDir + \
-        fmni_basename.replace('.nii.gz', method_suffix + fsl_ext())
-
-    fharvard_basename = path.basename(fharvard)
-    fharvard_out = regDir + \
-        fharvard_basename.replace('.nii.gz', method_suffix + fsl_ext())
+    fatlas_basename = path.basename(fatlas)
+    fatlas_out = regDir + \
+        fatlas_basename.replace('.nii.gz', method_suffix + fsl_ext())
 
     ftransform_out = regDir + 'ants_native2mni_'
-    if not path.exists(fharvard_out):
-        print('Running Ants Registration')
+    print('Running Ants Registration')
 
-        # Make template mask
-        ftemplate_mask = regDir + \
-            ftempbasename.replace('.nii.gz', '_mask' + fsl_ext())
+    # Make template mask
+    ftemplate_mask = regDir + \
+        ftempbasename.replace('.nii.gz', '_mask' + fsl_ext())
+    if not path.exists(ftemplate_mask):
         system('fslmaths ' + ftemplate + ' -bin ' + ftemplate_mask)
 
+    if not path.exists(ftransform_out + '1InverseWarp.nii.gz'):
         system('antsRegistrationSyN.sh' +
-               ' -d 3' +
-               ' -f ' + ftemplate +
-               ' -m ' + fsource +
-               ' -o ' + ftransform_out +
-               ' -x ' + ftemplate_mask +
-               ' -n 8 ')
+                ' -d 3' +
+                ' -f ' + ftemplate +
+                ' -m ' + fsource +
+                ' -o ' + ftransform_out +
+                ' -x ' + ftemplate_mask +
+                ' -n 8 ')
 
-        print('Warping probabilistic atlases to native space')
+    print('Warping probabilistic atlas to native space')
 
+    if not path.exists(fatlas_out):
         system('antsApplyTransforms' +
-               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
-               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
-               ' -r ' + fsource +
-               ' -i ' + fgm +
-               ' -o ' + fgm_out)
-
-        system('antsApplyTransforms' +
-               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
-               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
-               ' -r ' + fsource +
-               ' -i ' + fwm +
-               ' -o ' + fwm_out)
-
-        system('antsApplyTransforms' +
-               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
-               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
-               ' -r ' + fsource +
-               ' -i ' + fcsf +
-               ' -o ' + fcsf_out)
-
-        system('antsApplyTransforms' +
-               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
-               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
-               ' -r ' + fsource +
-               ' -e 3 ' +
-               ' -i ' + fmni +
-               ' -o ' + fmni_out)
-
-        system('antsApplyTransforms' +
-               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
-               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
-               ' -r ' + fsource +
-               ' -e 3 ' +
-               ' -i ' + fharvard +
-               ' -o ' + fharvard_out)
+                ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
+                ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
+                ' -r ' + fsource +
+                ' -e 3 ' +
+                ' -i ' + fatlas +
+                ' -o ' + fatlas_out)
     else:
         print("ANTs nonlinear registeration of atlases already performed")
 
-    return fgm_out, fwm_out, fcsf_out, fmni_out, fharvard_out
+    return fatlas_out
 
 
 def initial_voxel_labels(subID, segDir, fharvard, md_file=None, md_thresh=0.0015, fa_file=None, fa_thresh=0.5):
@@ -1059,18 +1027,13 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
     ftemplate = environ['FSLDIR'] + \
         '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
 
-    fgm = '../Data/tissuepriors/avg152T1_gm_resampled.nii'
-    fwm = '../Data/tissuepriors/avg152T1_wm_resampled.nii'
-    fcsf = '../Data/tissuepriors/avg152T1_csf_resampled.nii'
-
-    fmni = environ['FSLDIR'] + '/data/atlases/MNI/MNI-prob-1mm.nii.gz'
     fharvard = environ['FSLDIR'] + \
         '/data/atlases/HarvardOxford/HarvardOxford-sub-prob-1mm.nii.gz'
-    fgm_native, fwm_native, fcsf_native, fmni_native, fharvard_native = register_prob_maps_ants(
-        ffa, ftemplate, fmask, fgm, fwm, fcsf, fmni, fharvard, regDir)
+    fharvard_native = register_probatlas_to_native(
+        ffa, ftemplate, fharvard, regDir)
 
     # Perform iterative tissue classification
-    #fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
+    # fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
 
     # Perform subcortical segmentation
     if not path.exists(segDir):
@@ -1083,11 +1046,11 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
 
     return
 
-#sublist_fa = np.zeros((len(subList),8))
-#sublist_fa_std = np.zeros((len(subList),8))
-#sublist_md = np.zeros((len(subList),8))
-#sublist_md_std = np.zeros((len(subList),8))
-#sub_ind = 0
+# sublist_fa = np.zeros((len(subList),8))
+# sublist_fa_std = np.zeros((len(subList),8))
+# sublist_md = np.zeros((len(subList),8))
+# sublist_md_std = np.zeros((len(subList),8))
+# sub_ind = 0
 
 #    FA, FAstd, MD, MDstd = extract_FA_MD_from_subcortical_segmentations(subID, segDir, ffa, fmd)
 #    sublist_fa[sub_ind,:] = FA
