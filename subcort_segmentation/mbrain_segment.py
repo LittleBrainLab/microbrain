@@ -84,7 +84,7 @@ def fsl_ext():
     return fsl_extension
 
 
-def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir):
+def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
     """
     Given an image will register this image to the template (ANTs SyN)
     Then applies this transform to an atlas
@@ -96,6 +96,10 @@ def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir):
     fatlas: 4D nifti file in MNI space to be registered
     regDir: Directory to store outpu
 
+    Optional Parameters
+    -------------------
+    cpu_num: integer defining the number of cpu threads to use for registration
+
     Returns
     -------
     fatlas_out: filename for atlas registered to native space
@@ -103,18 +107,21 @@ def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir):
     if not path.exists(regDir):
         system('mkdir ' + regDir)
 
+    if cpu_num > 0:
+        cpu_str = ' -n ' + str(cpu_num)
+    else:
+        cpu_str = ''
+
     method_suffix = '_ANTsReg_native'
     ftempbasename = path.basename(ftemplate)
-    ftemplate_out = regDir + \
-        ftempbasename.replace('.nii.gz', method_suffix + fsl_ext())
 
     fatlas_basename = path.basename(fatlas)
     fatlas_out = regDir + \
         fatlas_basename.replace('.nii.gz', method_suffix + fsl_ext())
 
     ftransform_out = regDir + 'ants_native2mni_'
-    print('Running Ants Registration')
 
+    print('Running Ants Registration')
     # Make template mask
     ftemplate_mask = regDir + \
         ftempbasename.replace('.nii.gz', '_mask' + fsl_ext())
@@ -123,35 +130,50 @@ def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir):
 
     if not path.exists(ftransform_out + '1InverseWarp.nii.gz'):
         system('antsRegistrationSyN.sh' +
-                ' -d 3' +
-                ' -f ' + ftemplate +
-                ' -m ' + fsource +
-                ' -o ' + ftransform_out +
-                ' -x ' + ftemplate_mask +
-                ' -n 8 ')
+               ' -d 3' +
+               ' -f ' + ftemplate +
+               ' -m ' + fsource +
+               ' -o ' + ftransform_out +
+               ' -x ' + ftemplate_mask +
+               cpu_str)
 
     print('Warping probabilistic atlas to native space')
-
     if not path.exists(fatlas_out):
         system('antsApplyTransforms' +
-                ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
-                ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
-                ' -r ' + fsource +
-                ' -e 3 ' +
-                ' -i ' + fatlas +
-                ' -o ' + fatlas_out)
+               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
+               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
+               ' -r ' + fsource +
+               ' -e 3 ' +
+               ' -i ' + fatlas +
+               ' -o ' + fatlas_out)
     else:
         print("ANTs nonlinear registeration of atlases already performed")
 
     return fatlas_out
 
 
-def initial_voxel_labels(subID, segDir, fharvard, md_file=None, md_thresh=0.0015, fa_file=None, fa_thresh=0.5):
+def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=None, md_thresh=0.0015, fa_file=None, fa_thresh=0.5):
+    """
+    Generates 3D meshes from the FSL harvard brain atlas.
 
-    # Make output directory
-    initSegDir = segDir + 'structure_initialization/'
-    if not path.exists(initSegDir):
-        system('mkdir ' + initSegDir)
+    Parameters
+    ----------
+    fharvard: filename for the harvard probabilistic atlas to be used (usually registered to native space)
+    output_prefix: prefix used for output filenames
+    outDir: Output directory to store all files
+
+    Optional Parameters:
+    --------------------
+    md_file: filename for Mean Diffusivity Map used to remove voxels from labels (useful in case of poor registration to native space)
+    md_thresh: Removes voxels in lables with MD > md_thresh
+
+    fa_file: filename for Fractional Anisotropy Map used to remove voxels from labels (useful in case of poor registration to native space)
+    fa_thresh: Removes voxels in lables with FA > fa_thresh
+
+    Returns
+    -------
+    None
+    """
 
     if md_file:
         md_data = nib.load(md_file).get_data()
@@ -159,7 +181,7 @@ def initial_voxel_labels(subID, segDir, fharvard, md_file=None, md_thresh=0.0015
     if fa_file:
         fa_data = nib.load(fa_file).get_data()
 
-    finitlabels_prefix = initSegDir + subID + '_initialization'
+    finitlabels_prefix = outDir + output_prefix + '_initialization'
 
     harvard_img = nib.load(fharvard)
     harvard_data = harvard_img.get_data()
@@ -188,12 +210,7 @@ def initial_voxel_labels(subID, segDir, fharvard, md_file=None, md_thresh=0.0015
                      'LEFT_PUTAMEN',
                      'LEFT_GLOBUS',
                      'LEFT_HIPPO',
-                     'LEFT_AMYGDALA',
-                     'LEFT_ACCUMBENS',
-                     'LEFT_HIPPOAMYG',
-                     'LEFT_STRIATUM',
-                     'RIGHT_THALAMUS',
-                     'RIGHT_CAUDATE',
+                     'LEFT_AMYGDALA', threads
                      'RIGHT_PUTAMEN',
                      'RIGHT_GLOBUS',
                      'RIGHT_HIPPO',
@@ -262,12 +279,27 @@ def initial_voxel_labels(subID, segDir, fharvard, md_file=None, md_thresh=0.0015
     thalamus_surf = appender.GetOutput()
     sutil.write_surf_vtk(thalamus_surf, finitlabels_prefix + '_THALAMUS.vtk')
 
-    return initSegDir
+    return
 
 # move to surf_util.py
 
 
 def surf_to_volume_mask(fdwi, fmesh, inside_val, fout):
+    """
+    Outputs a voxel label for a given 3D mesh, label includes all voxels whose center is within the mesh
+
+    Parameters
+    ----------
+    fdwi: filename for 3Dnifti file which defines the voxel grid for the label
+    fmesh: vtk file for the mesh that will be converted to a voxel label
+    inside_val: integer value assigned to the voxel label
+    fout: output nifti file containing the label
+
+    Returns
+    -------
+    None
+    """
+
     # Transform the vtk mesh to native space
     surfVTK = sutil.read_surf_vtk(fmesh)
     vtkImage, vtkHeader, sformMat = sutil.read_image(fdwi)
@@ -305,8 +337,24 @@ def surf_to_volume_mask(fdwi, fmesh, inside_val, fout):
 
     return
 
+# move to surf_util.py
+
 
 def extract_surfaces_from_labels(flabels, label_list, outDir, fout_prefix):
+    """
+    Given a 3D nifti file containing a voxelwise labeling of structures, output a smoothed 3D surface representation of the labels
+
+    Parameters
+    ----------
+    flabels: 3D nifti file containing labels
+    label_list: list of label integers indicating which labels to convert to surfaces (e.g. [1, 3])
+    outDir: directory to output the meshes
+    fout_prefix: filen
+
+    Returns
+    -------
+    list of outputed vtk files
+    """
 
     # Read in labels output nifti images
     label_img = nib.load(flabels)
@@ -325,6 +373,7 @@ def extract_surfaces_from_labels(flabels, label_list, outDir, fout_prefix):
         fout_surf = fout_prefix + '_' + str(label_ind) + '.vtk'
         system('mirtk extract-surface ' + ftmpNII +
                ' ' + fout_surf + ' -isovalue 0.5')
+        system('rm ' + ftmpNII)
 
         # Smooth surface for the label
         system('mirtk smooth-surface ' + fout_surf + ' ' +
@@ -339,6 +388,28 @@ def extract_surfaces_from_labels(flabels, label_list, outDir, fout_prefix):
 
 
 def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSegDir, subID, cpu_num=0):
+    """
+    Script to segment subcortical brain regions with 3D surface based deformation using DTI images/maps
+
+    Parameters
+    ----------
+    fdwi: filename for mean diffusion weigthed image (suggested b1000) used for globus pallidus segmentation
+    ffa: filename for fa map
+    ffmd: filename for md map
+    fharvard_native: FSL harvard probabilistic atlas transformed to native space
+    segDir: parent directory to store pipeline output
+    initSegDir: directory containing initial structure surfaces generated using initial_voxel_labels_from_harvard
+    subID: the subID for the current subject (used as prefix for output)
+
+    Optional Parameters
+    -------------------
+    cpu_num: number of cpu threads for MIRTK deform-mesh to use (default is mirtk default of all available threads)
+
+    Returns
+    -------
+    none
+    """
+
     min_edgelength = 0.6
     max_edgelength = 1.1
 
@@ -907,10 +978,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #
 #    finput_basename = path.basename(finput)
 #    fn4correct = segDir + finput_basename.replace(fsl_ext(), '_n4_' + itr_str + fsl_ext())
-#    fbias = segDir + finput_basename.replace(fsl_ext(), '_n4bias_' + itr_str + fsl_ext())
-#
-#    if not path.exists(fn4correct):
-#        if is_tool('N4BiasFieldCorrection'):
+#    fbias = segDir's regime and chairman Bill Kenwright weol('N4BiasFieldCorrection'):
 #                process = subprocess.run(['fslcpgeom', finput, fmask], stdout=subprocess.PIPE, universal_newlines=True)
 #                n4command = ['N4BiasFieldCorrection',
 #                                '-i', finput,
@@ -1008,7 +1076,26 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 #
 #    return fdwi_final, fseg_final, fgm_prob_final, fwm_prob_final, fcsf_prob_final
 
-def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num=0):
+def segment(procDir, subID, preproc_suffix, shell_suffix, cpu_num=0):
+    """
+    Subcortical brain segmentation with 3D surface based deformation using DTI images/maps
+
+    Parameters
+    ----------
+    procDir: parent director containing subject
+    subID: the subject to be processed
+    preproc_suffix: suffix detailing what preprocessing has been performed
+    shell_suffix: suffix detailing what shells were used when running microbrain
+
+    Optional Parameters
+    -------------------
+    cpu_num: number of threads to use for computationally intense tasks
+
+    Returns
+    -------
+    none
+    """
+
     subDir = procDir + '/' + subID
     segDir = subDir + '/subcortical_segmentation/'
     regDir = subDir + '/registration/'
@@ -1030,16 +1117,19 @@ def segment(fmask, procDir, subID, preproc_suffix, shell_suffix, shells, cpu_num
     fharvard = environ['FSLDIR'] + \
         '/data/atlases/HarvardOxford/HarvardOxford-sub-prob-1mm.nii.gz'
     fharvard_native = register_probatlas_to_native(
-        ffa, ftemplate, fharvard, regDir)
+        ffa, ftemplate, fharvard, regDir, cpu_num=cpu_num)
 
-    # Perform iterative tissue classification
-    # fdwi, fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out = multichannel_tissue_classifcation(ffirstb0, ffa, fmd, fdiff, fmask, fgm_native, fwm_native, fcsf_native, fharvard_native, bvals, shells, tissueDir)
-
-    # Perform subcortical segmentation
+    # Parent Directory to store all output
     if not path.exists(segDir):
         system('mkdir ' + segDir)
-    initSegDir = initial_voxel_labels(
-        subID, segDir, fharvard_native, md_file=fmd, fa_file=ffa)
+
+    # Directory to store initial meshes
+    initSegDir = segDir + 'structure_initialization/'
+    if not path.exists(initSegDir):
+        system('mkdir ' + initSegDir)
+
+    initial_voxel_labels_from_harvard(
+        fharvard_native, subID, initSegDir, md_file=fmd, fa_file=ffa)
 
     deform_subcortical_surfaces(
         fdwi, ffa, fmd, fharvard_native, segDir, initSegDir, subID, cpu_num=cpu_num)

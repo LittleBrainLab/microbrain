@@ -1,5 +1,11 @@
 #!/usr/local/bin/python
-import os,sys,getopt
+import mbrain_cortical_segmentation as mbrain_cort
+import mbrain_segment as mbrain_seg
+import mbrain_modelling as mbrain_modelling
+import mbrain_preproc as mbrain_preproc
+import os
+import sys
+import getopt
 import shutil
 import glob
 from os import system
@@ -15,16 +21,13 @@ from dipy.core.gradients import gradient_table
 import dipy.reconst.dti as dti
 
 sys.path.append('../preprocessing/')
-import mbrain_preproc as mbrain_preproc
 
 sys.path.append('../modelling/')
-import mbrain_modelling as mbrain_modelling
 
 sys.path.append('../subcort_segmentation/')
-import mbrain_segment as mbrain_seg
 
 sys.path.append('../surfing/')
-import mbrain_cortical_segmentation as mbrain_cort
+
 
 def fsl_ext():
     fsl_extension = ''
@@ -34,16 +37,17 @@ def fsl_ext():
         fsl_extension = '.nii.gz'
     return fsl_extension
 
+
 def main(argv):
     inputDir = ''
     outputDir = ''
-    bval_list =[]
-    
+    bval_list = []
+
     # Three masking options
     bet_mask = False
     microbrain_mask = False
     explicit_mask = ''
-    
+
     fval = 0.3
     gval = 0.0
     rerun_mask = False
@@ -65,7 +69,7 @@ def main(argv):
     diffusion_seg = False
     cort_seg = False
     freesurfDir = False
-    N4 = True # By default do N4 correction on DWI image based on the bias field from b0
+    N4 = True  # By default do N4 correction on DWI image based on the bias field from b0
     cpu_num = 0
 
     help_string = """usage: microbrain.py -s <Subject Directory> -b <bvaluelist> [options]
@@ -125,19 +129,20 @@ def main(argv):
 
     try:
         # Note some of these options were left for testing purposes
-        opts, args = getopt.getopt(argv,"hs:b:i:",["idcm=","subdir=","bvalues=", "bet-mask", "microbrain-mask", "explicit-mask=","pe_direction=","EffectiveEcho=", "AcqReadout=", "rerun-mask", "dmppca", "dnlsam", "cpu-num=","gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb","allxeddy", "allxn4", "stabilize"])
+        opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=", "rerun-mask",
+                                   "dmppca", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize"])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
-    
+
     if len(opts) == 0:
         print(help_string)
         sys.exit(2)
-        
+
     for opt, arg in opts:
         if opt == '-h':
             print(help_string)
-            
+
             sys.exit()
         elif opt in ("-s", "--subdir"):
             outputDir = os.path.normpath(arg)
@@ -201,14 +206,14 @@ def main(argv):
             dti_model = True
             diffusion_seg = True
             N4 = True
-        elif opt in ("--cb"): 
+        elif opt in ("--cb"):
             mask = True
             eddy = True
             cuda = True
             dti_model = True
             diffusion_seg = True
             N4 = True
-        elif opt in("--hcp"):
+        elif opt in ("--hcp"):
             mask = True
             dti_model = True
             diffusion_seg = True
@@ -216,11 +221,11 @@ def main(argv):
 
     outputDir, subID = os.path.split(outputDir)
     print('Processing:' + subID)
-    print('OutDir: ' + outputDir) 
-    
+    print('OutDir: ' + outputDir)
+
     total_t_start = time()
     print("Starting dMRI processing for: " + subID)
-   
+
     # Naming convention for output directories
     origDir = outputDir + '/' + subID + '/orig/'
     preprocDir = outputDir + '/' + subID + '/preprocessed/'
@@ -232,7 +237,8 @@ def main(argv):
     cortDir = outputDir + '/' + subID + '/cortical_segmentation/'
 
     if not os.path.exists(preprocDir):
-        process = subprocess.run(['mkdir', preprocDir], stdout=subprocess.PIPE, universal_newlines=True)
+        process = subprocess.run(
+            ['mkdir', preprocDir], stdout=subprocess.PIPE, universal_newlines=True)
 
     # Decide what type of spatial distortion correction should be performed based on what filenames exist in the subject directory
     fieldmapDir = outputDir + '/' + subID + '/orig_fieldmap/'
@@ -243,7 +249,7 @@ def main(argv):
         if not pe_direction_specified or not acq_readout_specified or not effective_echo:
             print("Error:  AcqReadout, pe_direction and EffectiveEcho arguments needed to be specified to use field map distortion correction. Exiting")
             sys.exit()
-        
+
         fieldmap = True
         ffieldmap_hz = fieldmapDir + subID + '_fieldmap_hz' + fsl_ext()
         ffieldmap_rad = fieldmapDir + subID + '_fieldmap_rad' + fsl_ext()
@@ -252,21 +258,22 @@ def main(argv):
     elif os.path.exists(reverseDir):
         print("Reverse Phase Encode Data Found: using FSL topup for spatial distortion correction")
         if not pe_direction_specified:
-            print("Error: PE direction argument needs to be specified to use topup distortion correction. Exiting")
+            print(
+                "Error: PE direction argument needs to be specified to use topup distortion correction. Exiting")
             sys.exit()
 
         topup = True
-        
+
     fdwi = origDir + subID + fsl_ext()
     fbval = fdwi.replace(fsl_ext(), '.bval')
     fbvec = fdwi.replace(fsl_ext(), '.bvec')
     fjson = fdwi.replace(fsl_ext(), '.json')
 
-    ## Denoising/Gibbs ringing correction
+    # Denoising/Gibbs ringing correction
     fout = fdwi
     bvals, bvecs = read_bvals_bvecs(fbval, fbvec)
     preproc_suffix = ''
-   
+
     # Generate a mask of data
     if explicit_mask != '':
         fmask = explicit_mask
@@ -274,18 +281,19 @@ def main(argv):
         # Extract b0s
         fout_img = nib.load(fout)
         fout_data = fout_img.get_data()
-        
-        b0_data = fout_data[:,:,:,np.logical_or(bvals < 50, bvals > -50)]
-        firstb0_data = b0_data[:,:,:,0]
+
+        b0_data = fout_data[:, :, :, np.logical_or(bvals < 50, bvals > -50)]
+        firstb0_data = b0_data[:, :, :, 0]
         ffirstb0 = fout.replace(fsl_ext(), '_firstb0' + fsl_ext())
         nib.save(nib.Nifti1Image(firstb0_data, fout_img.affine), ffirstb0)
-    
+
         fbrain = ffirstb0.replace(fsl_ext(), '_brain' + fsl_ext())
         fmask = ffirstb0.replace(fsl_ext(), '_brain_mask' + fsl_ext())
-        process = subprocess.run(['bet',ffirstb0, fbrain, '-m','-f','0.3'], stdout=subprocess.PIPE, universal_newlines=True)
-    
+        process = subprocess.run(['bet', ffirstb0, fbrain, '-m', '-f', '0.3'],
+                                 stdout=subprocess.PIPE, universal_newlines=True)
+
     elif microbrain_mask:
-        fmd = fout.replace(fsl_ext(),'_MD' + fsl_ext())
+        fmd = fout.replace(fsl_ext(), '_MD' + fsl_ext())
         if not os.path.exists(fmd):
             fout_img = nib.load(fout)
             fout_data = fout_img.get_data()
@@ -293,7 +301,8 @@ def main(argv):
             tolerance = 50
             b_idx = []
             for shell in bval_list:
-                b_idx = np.append(b_idx, np.squeeze(np.array(np.where(np.logical_and(bvals < shell + tolerance, bvals > shell - tolerance)))))
+                b_idx = np.append(b_idx, np.squeeze(np.array(np.where(
+                    np.logical_and(bvals < shell + tolerance, bvals > shell - tolerance)))))
             b_idx = b_idx.astype(int)
 
             print('Modelling Tensor using ' + str(b_idx.shape) + ' volumes:')
@@ -303,14 +312,15 @@ def main(argv):
 
             sub_bvals = bvals[b_idx]
             sub_bvecs = bvecs[b_idx]
-            fout_data = fout_data[:,:,:,b_idx]
+            fout_data = fout_data[:, :, :, b_idx]
 
             gtab = gradient_table(sub_bvals, sub_bvecs)
-            
+
             print("Fitting Tensor for Mask")
             tenmodel = dti.TensorModel(gtab)
             tenfit = tenmodel.fit(fout_data)
-            nib.save(nib.Nifti1Image(tenfit.md.astype(np.float32), fout_img.affine), fmd)
+            nib.save(nib.Nifti1Image(tenfit.md.astype(
+                np.float32), fout_img.affine), fmd)
         else:
             print("Already Fit Tensor for Mask: Skipping")
 
@@ -318,36 +328,42 @@ def main(argv):
         fmask = fmd.replace(fsl_ext(), '_brain_mask' + fsl_ext())
         if not os.path.exists(fmask):
             print("Masking MD Map")
-            process = subprocess.run(['bet',fmd, fmd_brain, '-m','-f','0.3'], stdout=subprocess.PIPE, universal_newlines=True)
+            process = subprocess.run(
+                ['bet', fmd, fmd_brain, '-m', '-f', '0.3'], stdout=subprocess.PIPE, universal_newlines=True)
         else:
             print("Already Masked MD Map: skipping")
-    
-    else: # Create a mask inclusive of all voxels
+
+    else:  # Create a mask inclusive of all voxels
         fout_img = nib.load(fout)
         fout_data = fout_img.get_data()
         fmask = fout.replace(fsl_ext(), '_fake_mask' + fsl_ext())
-        fake_mask_data = np.ones(np.shape(np.squeeze(fout_data[:,:,:,0])))
+        fake_mask_data = np.ones(np.shape(np.squeeze(fout_data[:, :, :, 0])))
         nib.save(nib.Nifti1Image(fake_mask_data, fout_img.affine), fmask)
 
     # Signal stabilization and/or denoising with NLSAM (automatic estimates for N and sigma via st-jean 2020, Medical Image Analysis)
     if dnlsam:
-        fout = mbrain_preproc.denoiseNLSAM(fout, fmask, fbval, fbvec, preprocDir, cpu_num=proc_num)
+        fout = mbrain_preproc.denoiseNLSAM(
+            fout, fmask, fbval, fbvec, preprocDir, cpu_num=proc_num)
         preproc_suffix = preproc_suffix + '_DNLSAM'
     elif stabilize:
-        fout = mbrain_preproc.stabilizeNLSAM(fout, fmask, fbval, fbvec, preprocDir)
+        fout = mbrain_preproc.stabilizeNLSAM(
+            fout, fmask, fbval, fbvec, preprocDir)
         preproc_suffix = preproc_suffix + '_STAB'
 
     # Denosing using MPPCA
     if dmppca:
-        fout = mbrain_preproc.denoiseMPPCA(fout, fbval, fbvec, preprocDir, patch_radius=2)
+        fout = mbrain_preproc.denoiseMPPCA(
+            fout, fbval, fbvec, preprocDir, patch_radius=2)
         preproc_suffix = preproc_suffix + '_DMPPCA'
 
     if gibbs:
-        fout, stdout, returncode = mbrain_preproc.gibbsRingingCorrection(fout, preprocDir)
+        fout, stdout, returncode = mbrain_preproc.gibbsRingingCorrection(
+            fout, preprocDir)
         if returncode != 0:
-            print('DSurfer: unring.a64 returned an error, make sure it is installed correctly')
+            print(
+                'DSurfer: unring.a64 returned an error, make sure it is installed correctly')
             sys.exit()
-        
+
         preproc_suffix = preproc_suffix + '_GR'
 
     # Run FSL Topup if required
@@ -355,30 +371,33 @@ def main(argv):
     if topup:
         fpe_ind = fdwi.replace(fsl_ext(), '_PEIND.txt')
         pe_direction_ind = np.loadtxt(fpe_ind, delimiter=' ')
-        b0_pe_direction = pe_direction_ind[np.logical_and(bvals >= -20, bvals <= 20)]
-        
-        facq = preprocDir + 'acqparam.txt'
-        acq=np.zeros((b0_pe_direction.shape[0], 4))
-        acq[:,3] = 0.05 # Note this number will make the off-resonance field not scaled properly
-        
-        if pe_direction == 'LR':
-            acq[:,0] = b0_pe_direction
-        if pe_direction == 'RL':
-            acq[:,0] = b0_pe_direction * -1
-        elif pe_direction == 'AP':
-            acq[:,1] = b0_pe_direction
-        elif pe_direction == 'PA':
-            acq[:,1] = b0_pe_direction * -1
+        b0_pe_direction = pe_direction_ind[np.logical_and(
+            bvals >= -20, bvals <= 20)]
 
-        np.savetxt(facq, acq, delimiter=' ',fmt='%.2f')
+        facq = preprocDir + 'acqparam.txt'
+        acq = np.zeros((b0_pe_direction.shape[0], 4))
+        # Note this number will make the off-resonance field not scaled properly
+        acq[:, 3] = 0.05
+
+        if pe_direction == 'LR':
+            acq[:, 0] = b0_pe_direction
+        if pe_direction == 'RL':
+            acq[:, 0] = b0_pe_direction * -1
+        elif pe_direction == 'AP':
+            acq[:, 1] = b0_pe_direction
+        elif pe_direction == 'PA':
+            acq[:, 1] = b0_pe_direction * -1
+
+        np.savetxt(facq, acq, delimiter=' ', fmt='%.2f')
 
         findex = preprocDir + 'index.txt'
         index = np.ones(bvals.shape)
-        first_reverseb0 = np.where(b0_pe_direction==1)[0]
+        first_reverseb0 = np.where(b0_pe_direction == 1)[0]
         index[pe_direction_ind == 1] = first_reverseb0[0] + 1
         np.savetxt(findex, index, delimiter='', newline=' ', fmt='%01d')
 
-        ftopup, ftopup_unwarped, stdout, returncode = mbrain_preproc.fslv6p0_topup(fb0s, facq)
+        ftopup, ftopup_unwarped, stdout, returncode = mbrain_preproc.fslv6p0_topup(
+            fb0s, facq)
     else:
         # Make index file based on bvalues
         findex = preprocDir + 'index.txt'
@@ -398,45 +417,45 @@ def main(argv):
             elif pe_direction == 'PA':
                 acq = [0, 1, 0, acq_readout]
         acq = np.array(acq).T
-        np.savetxt(facq, acq[None,:], fmt=('%01d','%01d','%01d','%.6f'))
+        np.savetxt(facq, acq[None, :], fmt=('%01d', '%01d', '%01d', '%.6f'))
 
-    #if mask:
+    # if mask:
         # If rerun mask flag, delete all data analyzed post mask and rerun all analysis
     #    if rerun_mask:
     #        for thisDir in [meanDWIDir, tensorDir, regDir, subcortDir, cortDir, preprocDir + 'eddy_output_files/']:
     #            if os.path.exists(thisDir):
     #                process = subprocess.run(['rm', '-r', thisDir], stdout=subprocess.PIPE, universal_newlines=True)
-    #        
+    #
     #        feddy = fout.replace(fsl_ext(), '_EDDY' + fsl_ext())
     #        if os.path.exists(feddy):
     #            process = subprocess.run(['rm', feddy], stdout=subprocess.PIPE, universal_newlines=True)
     #            process = subprocess.run(['rm', feddy + '.eddy_rotated_bvecs'], stdout=subprocess.PIPE, universal_newlines=True)
-            
-            #fmask = fout.replace(fsl_ext(), '_b0avg_BET_mask' + fsl_ext())
-            #if os.path.exists(fmask):
-            #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
 
-        #if topup:
-            #fbrain = ftopup_unwarped.replace(fsl_ext(), '_brain' + fsl_ext())
-            #fmask = ftopup_unwarped.replace(fsl_ext(), '_brain_mask' + fsl_ext())
-            #if os.path.exists(fmask):
-            #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
-           
-            #process = subprocess.run(['bet',ftopup_unwarped, fbrain, '-m','-f', str(fval)], stdout=subprocess.PIPE, universal_newlines=True)
-            #fmask, fb0avg, stdout, returncode = mbrain_preproc.fslv6p0_brain_mask(ftopup_unwarped,np.zeros((b0_data.shape[3],)),fval,gval)
-        #else:
-            #fbrain = ffirstb0.replace(fsl_ext(), '_brain' + fsl_ext())
-            #fmask = ffirstb0.replace(fsl_ext(), '_brain_mask' + fsl_ext())
-            #if os.path.exists(fmask):
-            #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
-            
-            #process = subprocess.run(['bet',ffirstb0, fbrain, '-m','-f', str(fval)], stdout=subprocess.PIPE, universal_newlines=True)
-            #fmask, fb0avg, stdout, returncode = mbrain_preproc.fslv6p0_brain_mask(fb0s,np.zeros((b0_data.shape[3],)),fval,gval)
-        
-        #if returncode != 0:
+        #fmask = fout.replace(fsl_ext(), '_b0avg_BET_mask' + fsl_ext())
+        # if os.path.exists(fmask):
+        #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
+
+        # if topup:
+        #fbrain = ftopup_unwarped.replace(fsl_ext(), '_brain' + fsl_ext())
+        #fmask = ftopup_unwarped.replace(fsl_ext(), '_brain_mask' + fsl_ext())
+        # if os.path.exists(fmask):
+        #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
+
+        #process = subprocess.run(['bet',ftopup_unwarped, fbrain, '-m','-f', str(fval)], stdout=subprocess.PIPE, universal_newlines=True)
+        #fmask, fb0avg, stdout, returncode = mbrain_preproc.fslv6p0_brain_mask(ftopup_unwarped,np.zeros((b0_data.shape[3],)),fval,gval)
+        # else:
+        #fbrain = ffirstb0.replace(fsl_ext(), '_brain' + fsl_ext())
+        #fmask = ffirstb0.replace(fsl_ext(), '_brain_mask' + fsl_ext())
+        # if os.path.exists(fmask):
+        #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
+
+        #process = subprocess.run(['bet',ffirstb0, fbrain, '-m','-f', str(fval)], stdout=subprocess.PIPE, universal_newlines=True)
+        #fmask, fb0avg, stdout, returncode = mbrain_preproc.fslv6p0_brain_mask(fb0s,np.zeros((b0_data.shape[3],)),fval,gval)
+
+        # if returncode != 0:
         #    print('DSurfer: bet2 returned an error, make sure it is installed correctly')
         #    sys.exit()
-    #else:
+    # else:
     #    # TODO Test this pipeline
     #    if topup:
     #        fmask, fb0avg = mbrain_preproc.fslv6p0_fake_brain_mask(ftopup_unwarped,np.zeros((b0_data.shape[3],)))
@@ -447,62 +466,77 @@ def main(argv):
     if eddy:
         if not json:
             fjson = False
-       
+
         # If using fieldmap register/interpolate it to the firstB0 image, this is needed prior to input into eddy
         ffieldmap_hz_reg2firstb0 = ''
         if fieldmap:
-            ffirstb0_brain = ffirstb0.replace(fsl_ext(),'_brain' + fsl_ext())
-            process = subprocess.run(['bet',ffirstb0, ffirstb0_brain, '-m','-f', str(fval)], stdout=subprocess.PIPE, universal_newlines=True)
-            
+            ffirstb0_brain = ffirstb0.replace(fsl_ext(), '_brain' + fsl_ext())
+            process = subprocess.run(['bet', ffirstb0, ffirstb0_brain, '-m', '-f', str(
+                fval)], stdout=subprocess.PIPE, universal_newlines=True)
+
             if pe_direction == 'AP':
                 unwarp_direction = 'y-'
             elif pe_direction == 'PA':
                 unwarp_direction = 'y'
             elif pe_direction == 'LR':
-                unwarp_direction = 'x' # TODO Test this
+                unwarp_direction = 'x'  # TODO Test this
             elif pe_direction == 'RL':
-                unwarp_direction = 'x-' # TODO Test this
+                unwarp_direction = 'x-'  # TODO Test this
 
-            ffieldmap_mag_warped = ffieldmap_mag.replace(fsl_ext(), '_warped' + fsl_ext())
-            process = subprocess.run(['fugue','-v','-i', ffieldmap_mag, '--unwarpdir=' + unwarp_direction, '--dwell=' + str(effective_echo),'--loadfmap=' + ffieldmap_rad,'-w',  ffieldmap_mag_warped], stdout=subprocess.PIPE, universal_newlines=True)
-            
-            ffieldmap_mag_warped_2firstb0 = ffieldmap_mag_warped.replace(fsl_ext(),'_2firstb0' + fsl_ext())
+            ffieldmap_mag_warped = ffieldmap_mag.replace(
+                fsl_ext(), '_warped' + fsl_ext())
+            process = subprocess.run(['fugue', '-v', '-i', ffieldmap_mag, '--unwarpdir=' + unwarp_direction, '--dwell=' + str(
+                effective_echo), '--loadfmap=' + ffieldmap_rad, '-w',  ffieldmap_mag_warped], stdout=subprocess.PIPE, universal_newlines=True)
+
+            ffieldmap_mag_warped_2firstb0 = ffieldmap_mag_warped.replace(
+                fsl_ext(), '_2firstb0' + fsl_ext())
             ffieldmap_2firstb0_mat = fieldmapDir + subID + '_fieldmap2firstb0.mat'
-            process = subprocess.run(['flirt','-in',ffieldmap_mag_warped,'-ref',  ffirstb0_brain, '-out', ffieldmap_mag_warped_2firstb0,'-omat',ffieldmap_2firstb0_mat, '-dof', '6'], stdout=subprocess.PIPE, universal_newlines=True)
+            process = subprocess.run(['flirt', '-in', ffieldmap_mag_warped, '-ref',  ffirstb0_brain, '-out', ffieldmap_mag_warped_2firstb0,
+                                     '-omat', ffieldmap_2firstb0_mat, '-dof', '6'], stdout=subprocess.PIPE, universal_newlines=True)
 
-            ffieldmap_hz_reg2firstb0 = ffieldmap_hz.replace(fsl_ext(),'_reg2firstb0')
-            process = subprocess.run(['flirt','-in',ffieldmap_hz,'-ref',ffirstb0_brain,'-applyxfm','-init',ffieldmap_2firstb0_mat,'-out',ffieldmap_hz_reg2firstb0,'-interp','spline'], stdout=subprocess.PIPE, universal_newlines=True)
-            
+            ffieldmap_hz_reg2firstb0 = ffieldmap_hz.replace(
+                fsl_ext(), '_reg2firstb0')
+            process = subprocess.run(['flirt', '-in', ffieldmap_hz, '-ref', ffirstb0_brain, '-applyxfm', '-init', ffieldmap_2firstb0_mat,
+                                     '-out', ffieldmap_hz_reg2firstb0, '-interp', 'spline'], stdout=subprocess.PIPE, universal_newlines=True)
+
             # Use giant fieldmap mask for input into eddy
-            ffieldmap_mask = ffieldmap_mag.replace('brain1' + fsl_ext(),'brain_mask' + fsl_ext())
-            fmask_field = ffirstb0.replace(fsl_ext(), '_mask_fieldmap' + fsl_ext())
-            process = subprocess.run(['flirt','-in', ffieldmap_mask,'-ref',ffirstb0_brain,'-applyxfm','-init',ffieldmap_2firstb0_mat,'-out',fmask_field,'-interp','nearestneighbour'], stdout=subprocess.PIPE, universal_newlines=True)
+            ffieldmap_mask = ffieldmap_mag.replace(
+                'brain1' + fsl_ext(), 'brain_mask' + fsl_ext())
+            fmask_field = ffirstb0.replace(
+                fsl_ext(), '_mask_fieldmap' + fsl_ext())
+            process = subprocess.run(['flirt', '-in', ffieldmap_mask, '-ref', ffirstb0_brain, '-applyxfm', '-init', ffieldmap_2firstb0_mat,
+                                     '-out', fmask_field, '-interp', 'nearestneighbour'], stdout=subprocess.PIPE, universal_newlines=True)
             fmask_eddy = fmask_field
 
-            #Fieldmap lies outside the b0 mask so dilate it
+            # Fieldmap lies outside the b0 mask so dilate it
             #fmask_dil = fmask.replace(fsl_ext(), '_dil' + fsl_ext())
             #process = subprocess.run(['fslmaths', fmask, '-kernel', 'box', '15', '-dilF', fmask_dil], stdout=subprocess.PIPE, universal_newlines=True)
             #fmask = fmask_dil
         else:
             fmask_eddy = fmask
-        
+
         # Make sure mask has same dimensions as first b0 volume (sometimes prerproc steps mess this up)
         ffirstVol = fout.replace(fsl_ext(), '_firstVol' + fsl_ext())
-        process = subprocess.run(['fslroi', fout, ffirstVol,'0','1'], stdout=subprocess.PIPE, universal_newlines=True)
-        process = subprocess.run(['fslcpgeom', ffirstVol, fmask_eddy], stdout=subprocess.PIPE, universal_newlines=True)
+        process = subprocess.run(
+            ['fslroi', fout, ffirstVol, '0', '1'], stdout=subprocess.PIPE, universal_newlines=True)
+        process = subprocess.run(
+            ['fslcpgeom', ffirstVol, fmask_eddy], stdout=subprocess.PIPE, universal_newlines=True)
 
-        fout, fbvec_rotated, stdout, returncode = mbrain_preproc.fslv6p0_eddy(fout, facq, findex, fmask_eddy, fbval, fbvec, fjson, ftopup, ffieldmap_hz_reg2firstb0, cuda, preprocDir, preprocDir + 'eddy_output_files/')
+        fout, fbvec_rotated, stdout, returncode = mbrain_preproc.fslv6p0_eddy(
+            fout, facq, findex, fmask_eddy, fbval, fbvec, fjson, ftopup, ffieldmap_hz_reg2firstb0, cuda, preprocDir, preprocDir + 'eddy_output_files/')
         if returncode != 0:
-            print("DSurfer: FSL's eddy returned an error, make sure it is installed correctly")
+            print(
+                "DSurfer: FSL's eddy returned an error, make sure it is installed correctly")
             sys.exit()
 
-        bvals, bvecs = read_bvals_bvecs(fbval, fbvec_rotated) # update bvecs with rotated version from eddy correction
-        
+        # update bvecs with rotated version from eddy correction
+        bvals, bvecs = read_bvals_bvecs(fbval, fbvec_rotated)
+
         preproc_suffix = preproc_suffix + '_EDDY'
 
     # Remove preceding _
     if preproc_suffix != '':
-        preproc_suffix =  preproc_suffix[1:]
+        preproc_suffix = preproc_suffix[1:]
         suffix = preproc_suffix + '_' + shell_suffix
     else:
         preproc_suffix = ''
@@ -510,33 +544,39 @@ def main(argv):
 
     if dti_model:
         # Output Tensor and associated diffusion parametric maps
-        ffa, fmd, ffa_rgb, fad, frd, fevec, fpevec, ftensor = mbrain_modelling.output_DTI_maps_multishell(fout, fmask, bvals, bvecs, tensorDir, shells = bval_list)
-        
+        ffa, fmd, ffa_rgb, fad, frd, fevec, fpevec, ftensor = mbrain_modelling.output_DTI_maps_multishell(
+            fout, fmask, bvals, bvecs, tensorDir, shells=bval_list)
+
         # Output first b0 for N4 correction
         fout_img = nib.load(fout)
         fout_data = fout_img.get_data()
-    
-        b0_data = fout_data[:,:,:, np.logical_and(bvals >= -20, bvals <= 20)]
 
-        firstb0_data = b0_data[:,:,:,0]
+        b0_data = fout_data[:, :, :, np.logical_and(bvals >= -20, bvals <= 20)]
+
+        firstb0_data = b0_data[:, :, :, 0]
         ffirstb0_undistort = fout.replace(fsl_ext(), '_firstb0' + fsl_ext())
-        nib.save(nib.Nifti1Image(firstb0_data, fout_img.affine), ffirstb0_undistort)
-    
+        nib.save(nib.Nifti1Image(firstb0_data,
+                 fout_img.affine), ffirstb0_undistort)
+
         # Output Average DWI maps for each shell, as well as N4 corrected versions. Note, N4 correction applied to mean DWI not to the raw data itself)
         if N4:
-            fb0, fb0_n4, fdwi, fdwi_n4, stdout, returncode = mbrain_preproc.output_DWI_maps(ffirstb0_undistort, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell = bval_list[-1])
+            fb0, fb0_n4, fdwi, fdwi_n4, stdout, returncode = mbrain_preproc.output_DWI_maps(
+                ffirstb0_undistort, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell=bval_list[-1])
             if returncode != 0:
-                print("DSurfer: N4 returned an error, make sure it is installed correctly")
+                print(
+                    "DSurfer: N4 returned an error, make sure it is installed correctly")
                 sys.exit()
         else:
-            fb0, fb0_n4, fdwi, fdwi_n4 = mbrain_preproc.output_DWI_maps_noN4(ffirstb0_undistort, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell = bval_list[-1])
+            fb0, fb0_n4, fdwi, fdwi_n4 = mbrain_preproc.output_DWI_maps_noN4(
+                ffirstb0_undistort, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell=bval_list[-1])
 
         # Surface-based deformation subcortical segmentation
         if diffusion_seg:
-            mbrain_seg.segment(fmask, outputDir, subID, preproc_suffix, shell_suffix, bval_list, cpu_num=proc_num)
+            mbrain_seg.segment(outputDir, subID, preproc_suffix,
+                               shell_suffix, cpu_num=proc_num)
 
-        ## Surface-based deformation cortical segmentation
-        #if cort_seg:
+        # Surface-based deformation cortical segmentation
+        # if cort_seg:
         #    src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
         #    tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
         #    os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
@@ -548,5 +588,6 @@ def main(argv):
 
     return
 
+
 if __name__ == "__main__":
-   main(sys.argv[1:])
+    main(sys.argv[1:])
