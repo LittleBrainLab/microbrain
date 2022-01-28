@@ -11,7 +11,6 @@ from os import system
 import getopt
 import sys
 import os
-import microbrain.surfing.mbrain_cortical_segmentation as mbrain_cort
 import microbrain.subcort_segmentation.mbrain_segment as mbrain_seg
 import microbrain.modelling.mbrain_modelling as mbrain_modelling
 import microbrain.preprocessing.mbrain_preproc as mbrain_preproc
