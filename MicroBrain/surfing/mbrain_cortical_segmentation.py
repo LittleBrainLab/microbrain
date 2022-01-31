@@ -8,6 +8,7 @@ from scipy.ndimage.morphology import binary_fill_holes
 from scipy.ndimage.morphology import binary_closing, binary_dilation
 from scipy.ndimage.measurements import center_of_mass
 from scipy import ndimage
+from os import system, environ, path
 
 import os
 import vtk
@@ -140,11 +141,137 @@ def msm_reg(wm_sphere_gii, ref_sphere_gii, wm_sulc_gii, ref_sulc_gii, hemi, conf
     
     return
 
-def generate_initial_lr_wm(subDir, thisSub, suffix, surfDir):
+def register_probmap_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
+    """
+    Given an image will register this image to the template (ANTs SyN)
+    Then applies this transform to an atlas
 
-    tissueDir = subDir + 'tissue_classification/'
-    voxelDir = subDir + 'subcortical_segmentation/mesh_output/'
+    Parameters
+    ----------
+    fsource: image in native space
+    ftemplate: image template in MNI space (or normal space)
+    fatlas: 4D nifti file in MNI space to be registered
+    regDir: Directory to store outpu
+
+    Optional Parameters
+    -------------------
+    cpu_num: integer defining the number of cpu threads to use for registration
+
+    Returns
+    -------
+    fatlas_out: filename for atlas registered to native space
+    """
+    if not path.exists(regDir):
+        system('mkdir ' + regDir)
+
+    if cpu_num > 0:
+        cpu_str = ' -n ' + str(cpu_num)
+    else:
+        cpu_str = ''
+
+    method_suffix = '_ANTsReg_native'
+    ftempbasename = path.basename(ftemplate)
+
+    fatlas_basename = path.basename(fatlas)
+    fatlas_out = regDir + \
+        fatlas_basename.replace('.nii.gz', method_suffix + fsl_ext())
+
+    ftransform_out = regDir + 'ants_native2mni_'
+
+    print('Running Ants Registration')
+    # Make template mask
+    ftemplate_mask = regDir + \
+        ftempbasename.replace('.nii.gz', '_mask' + fsl_ext())
+    if not path.exists(ftemplate_mask):
+        system('fslmaths ' + ftemplate + ' -bin ' + ftemplate_mask)
+
+    if not path.exists(ftransform_out + '1InverseWarp.nii.gz'):
+        system('antsRegistrationSyN.sh' +
+               ' -d 3' +
+               ' -f ' + ftemplate +
+               ' -m ' + fsource +
+               ' -o ' + ftransform_out +
+               ' -x ' + ftemplate_mask +
+               cpu_str)
+
+    print('Warping probabilistic atlas to native space')
+    if not path.exists(fatlas_out):
+        system('antsApplyTransforms' +
+               ' -t [' + ftransform_out + '0GenericAffine.mat,1] ' +
+               ' -t ' + ftransform_out + '1InverseWarp.nii.gz ' +
+               ' -r ' + fsource +
+               ' -i ' + fatlas +
+               ' -o ' + fatlas_out)
+    else:
+        print("ANTs nonlinear registeration of atlases already performed")
+
+    return fatlas_out
+
+def multi_channel_tissue_classifier(ffa, fdwi, fmask, fgm_native, fwm_native, fcsf_native, segDir,tissue_prob_suffix, PriorWeight=0.1):
+   tissue_nclasses = 3
+
+   print("Starting Tissue Segmentation")
+   if not path.exists(segDir):
+           system('mkdir ' + segDir)
+
+   tissue_base_name = segDir + 'tissue_prob_' + tissue_prob_suffix + '_'
+   ftissuelabels = tissue_base_name + 'out_seg' + fsl_ext()
+   ftissueprobs_base = tissue_base_name + 'out_prob_'
+   if not path.exists(ftissuelabels):
+       # Copy tissue probability maps to base tissue fname
+       fprob_list = [fgm_native, fwm_native, fcsf_native]
+       for i in range(0,tissue_nclasses):
+           system('cp ' + fprob_list[i] + ' ' + tissue_base_name + str(i+1).zfill(2) + fsl_ext())
+           process = subprocess.run(['fslcpgeom', fdwi, tissue_base_name + str(i+1).zfill(2) + fsl_ext()], stdout=subprocess.PIPE, universal_newlines=True)
+
+       process = subprocess.run(['fslcpgeom', fdwi, ffa], stdout=subprocess.PIPE, universal_newlines=True)
+       process = subprocess.run(['fslcpgeom', fdwi, fmask], stdout=subprocess.PIPE, universal_newlines=True)
+       system('Atropos' +
+           ' -a [' + ffa + ']' +
+           ' -a [' + fdwi + ']' +
+           ' -x ' + fmask +
+           ' -i PriorProbabilityImages[' + str(tissue_nclasses) + ', ' + tissue_base_name + '%02d' + fsl_ext() + ',' + str(PriorWeight) + ',0.0001]' +
+           ' -m [0.3, 2x2x2] ' +
+           ' -s 1x2 -s 1x3 -s 2x3 ' +
+           ' --use-partial-volume-likelihoods false ' +
+           ' -o [' + ftissuelabels + ',' + ftissueprobs_base + '%02d' + fsl_ext() + ']' +
+           ' -k HistogramParzenWindows[1.0,32]')
+
+       # remove files used for input to Atropos
+       for i in range(0,tissue_nclasses):
+           system('rm ' + tissue_base_name + str(i+1).zfill(2) + fsl_ext())
+   else:
+       print("Tissue segmentation already completed")
+
+   fseg_out = ftissuelabels
+   fgm_prob_out = ftissueprobs_base + '01' + fsl_ext()
+   fwm_prob_out = ftissueprobs_base + '02' + fsl_ext()
+   fcsf_prob_out = ftissueprobs_base + '03' + fsl_ext()
+
+   return fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out
+
+def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, surfDir):
+
+    # Register GM, WM, CSF probability map to native space
     regDir = subDir + 'registration/'
+    
+    ftemplate =  os.environ['FSLDIR'] + '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
+    fgm = '../Data/tissuepriors/avg152T1_gm_resampled.nii'
+    fwm = '../Data/tissuepriors/avg152T1_wm_resampled.nii'
+    fcsf = '../Data/tissuepriors/avg152T1_csf_resampled.nii'
+    
+    ffa = subDir + 'DTI_maps/' + thisSub + suffix + '_FA' + fsl_ext()
+    fdwi = subDir + 'meanDWI/' + thisSub + '_DNLSAM_GR_EDDY_mean_b1000_n4' + fsl_ext() ## Fix this hard coded suffix
+
+    fgm_native = register_probmap_to_native(
+        ffa, ftemplate, fgm, regDir)
+    fwm_native = register_probmap_to_native(
+        ffa, ftemplate, fwm, regDir)
+    fcsf_native = register_probmap_to_native(
+        ffa, ftemplate, fcsf, regDir)
+
+    # Run multichannel tissue classificaiton using FA map and mean DWI 
+    fseg, _, _, _ = multi_channel_tissue_classifier(ffa, fdwi, fmask, fgm_native, fwm_native, fcsf_native, tissueDir)
 
     internal_struct_label = ['LEFT_THALAMUS',
                     'LEFT_GLOBUS',
@@ -197,8 +324,6 @@ def generate_initial_lr_wm(subDir, thisSub, suffix, surfDir):
 
     # Generate Cerrebellum, brainstem and ventricle segmentations
     # Output tissue masks
-    ffa = subDir + 'DTI_maps/' + thisSub + suffix + '_FA' + fsl_ext()
-    fdwi = subDir + 'meanDWI/' + thisSub + '_DNLSAM_GR_EDDY_mean_b1000_n4' + fsl_ext() ## Fix this hard coded suffix
     dwi_img = nib.load(fdwi)
 
     fgm_mask = surfDir + thisSub + suffix + '_gm_mask' + fsl_ext()
@@ -474,6 +599,7 @@ def generate_tensor_force_map(subDir, thisSub, preproc_suffix, suffix, surfDir, 
         fdwi = subDir + 'meanDWI/' + thisSub + '_mean_b1000_n4' + fsl_ext()
     else:
         fdwi = subDir + 'meanDWI/' + thisSub + '_' + preproc_suffix + '_mean_b1000_n4' + fsl_ext()
+
     dwi_img = nib.load(fdwi)
     dwi_data = dwi_img.get_data()
     dwi_data, new_affine = reslice(dwi_data, dwi_img.affine, old_vsize, new_vsize, order=1)
@@ -549,7 +675,7 @@ def generate_tensor_force_map(subDir, thisSub, preproc_suffix, suffix, surfDir, 
 
     return ftb_force, fdwi_mask, fdwi_neg, fWMGM_bound, fGMCSF_bound, fCSF_bound
 
-def generate_surfaces_from_dwi(outDir, thisSub, preproc_suffix, shell_suffix, freesurf_subdir):
+def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix, shell_suffix, freesurf_subdir):
     print("Surfing: " + thisSub)
     subDir = outDir + '/' + thisSub + '/'
     surfDir = subDir + 'surf/'
@@ -563,7 +689,7 @@ def generate_surfaces_from_dwi(outDir, thisSub, preproc_suffix, shell_suffix, fr
 
     wm_surf_fname = surfDir + thisSub + suffix + '_wm.vtk'
     
-    wm_lh_fname, wm_rh_fname, finter, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg = generate_initial_lr_wm(subDir, thisSub, suffix, surfDir)
+    wm_lh_fname, wm_rh_fname, finter, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg = generate_initial_lr_wm(fmask, voxelDir, subDir, thisSub, suffix, surfDir)
     #ftb_force, fdwi_mask, fdwi_neg, fWMGM_bound, fGMCSF_bound, fCSF_bound = generate_tensor_force_map(subDir, thisSub, preproc_suffix, suffix, surfDir, fa_target = fa_target)
 
     # Output Composite MD map
@@ -742,8 +868,7 @@ def generate_surfaces_from_dwi(outDir, thisSub, preproc_suffix, shell_suffix, fr
     lh_wm_fname = wm_final_fname.replace('.vtk','_lh.vtk')
     rh_wm_fname = wm_final_fname.replace('.vtk','_rh.vtk')    
     if not os.path.exists(lh_wm_fname) or not os.path.exists(rh_wm_fname):
-        [lh_wm,rh_wm] = sutil.split_surface_by_label(wm_surf)
-        sutil.write_surf_vtk(lh_wm, lh_wm_fname)
+        [lh_wm,rh_wm] = sut of the protest, Parliament's sergeant-at-(lh_wm, lh_wm_fname)
         sutil.write_surf_vtk(rh_wm, rh_wm_fname)
     lh_wm_gii = vtktogii(lh_wm_fname, 'ANATOMICAL', 'GRAY_WHITE' , 'CORTEX_LEFT')
     rh_wm_gii = vtktogii(rh_wm_fname, 'ANATOMICAL', 'GRAY_WHITE' , 'CORTEX_RIGHT')
@@ -763,7 +888,7 @@ def generate_surfaces_from_dwi(outDir, thisSub, preproc_suffix, shell_suffix, fr
         if hemi == 'lh':
             hemi_letter = 'L'
             C = 'CORTEX_LEFT'
-            wm_vtk = lh_wm_fname
+            wm_vtk = lh_wm_ of the protest, Parliament's sergeant-at-fname
             pial_vtk = lh_pial_fname
             wm_gii = lh_wm_gii
             pial_gii = lh_pial_gii
@@ -782,9 +907,7 @@ def generate_surfaces_from_dwi(outDir, thisSub, preproc_suffix, shell_suffix, fr
 
         # Curvature using White matter surface
         print("Processing Curvature on WM surface")
-        curv_vtk = wm_vtk.replace('.vtk','.curvature.vtk')
-        curv_gii = wm_gii.replace('.surf.gii','.curvature.native.shape.gii')
-        if not os.path.exists(curv_vtk):
+        curv_vtk = wm_vtk.r of the protest, Parliament's sergeant-at-sts(curv_vtk):
             os.system('mirtk calculate-surface-attributes ' + wm_vtk + ' ' + curv_vtk + ' -H Curvature -smooth-weighting Combinatorial -smooth-iterations 10 -vtk-curvatures') 
             os.system('mirtk calculate ' + curv_vtk + ' -mul -1 -scalars Curvature -out ' + curv_vtk)
             giimap(curv_vtk, curv_gii, 'Curvature', 'Curvature', C)
