@@ -143,19 +143,15 @@ def msm_reg(wm_sphere_gii, ref_sphere_gii, wm_sulc_gii, ref_sulc_gii, hemi, conf
 def generate_initial_lr_wm(subDir, thisSub, suffix, surfDir):
 
     tissueDir = subDir + 'tissue_classification/'
-    segDir = subDir + 'subcortical_segmentation/'
+    voxelDir = subDir + 'subcortical_segmentation/mesh_output/'
     regDir = subDir + 'registration/'
 
     internal_struct_label = ['LEFT_THALAMUS',
-                    'LEFT_CAUDATE',
-                    'LEFT_PUTAMEN',
                     'LEFT_GLOBUS',
-                    'LEFT_ACCUMBENS',
+                    'LEFT_STRIATUM',
                     'RIGHT_THALAMUS',
-                    'RIGHT_CAUDATE',
-                    'RIGHT_PUTAMEN',
                     'RIGHT_GLOBUS',
-                    'RIGHT_ACCUMBENS']
+                    'RIGHT_STRIATUM']
 
     external_struct_label = ['LEFT_HIPPO',
                              'LEFT_AMYGDALA',
@@ -166,21 +162,21 @@ def generate_initial_lr_wm(subDir, thisSub, suffix, surfDir):
                              'RIGHT_THALAMUS']
 
     # Make mask of internal structures
-    pseudo_white = np.zeros(nib.load(segDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
+    pseudo_white = np.zeros(nib.load(voxelDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
     for thisLabel in internal_struct_label:
-        thisStructFile = segDir + thisSub + '_refined_' + thisLabel + fsl_ext()
+        thisStructFile = voxelDir + thisSub + '_refined_' + thisLabel + fsl_ext()
         pseudo_white[nib.load(thisStructFile).get_data() > 0] = 1
 
     internal_mask = np.copy(pseudo_white)
 
-    external_mask = np.zeros(nib.load(segDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
+    external_mask = np.zeros(nib.load(voxelDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
     for thisLabel in external_struct_label:
-        thisStructFile = segDir + thisSub + '_refined_' + thisLabel + fsl_ext()
+        thisStructFile = voxelDir + thisSub + '_refined_' + thisLabel + fsl_ext()
         external_mask[nib.load(thisStructFile).get_data() > 0] = 1
 
-    thalamus_label = np.zeros(nib.load(segDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
+    thalamus_label = np.zeros(nib.load(voxelDir + thisSub + '_refined_LEFT_THALAMUS' + fsl_ext()).get_data().shape)
     for thisLabel in thalamus_struct_label:
-        thisStructFile = segDir + thisSub + '_refined_' + thisLabel + fsl_ext()
+        thisStructFile = voxelDir + thisSub + '_refined_' + thisLabel + fsl_ext()
         thalamus_label[nib.load(thisStructFile).get_data() > 0] = 1
 
     # Get WM segmentation

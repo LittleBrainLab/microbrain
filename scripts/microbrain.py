@@ -1,20 +1,21 @@
 #!/usr/local/bin/python
-import dipy.reconst.dti as dti
-from dipy.core.gradients import gradient_table
-from dipy.io import read_bvals_bvecs
-import nibabel as nib
-import numpy as np
-import subprocess
-from time import time
-from os import path
-from os import system
-import getopt
 import sys
-import os
-import microbrain.subcort_segmentation.mbrain_segment as mbrain_seg
-import microbrain.modelling.mbrain_modelling as mbrain_modelling
-import microbrain.preprocessing.mbrain_preproc as mbrain_preproc
+sys.path.append('../../MicroBrain/')
 
+import os
+import getopt
+from os import system
+from os import path
+from time import time
+import subprocess
+import numpy as np
+import nibabel as nib
+from dipy.io import read_bvals_bvecs
+from dipy.core.gradients import gradient_table
+import dipy.reconst.dti as dti
+from MicroBrain.subcort_segmentation import mbrain_segment
+from MicroBrain.modelling import mbrain_modelling
+from MicroBrain.preprocessing import mbrain_preproc
 
 def fsl_ext():
     fsl_extension = ''
@@ -559,16 +560,16 @@ def main(argv):
 
         # Surface-based deformation subcortical segmentation
         if diffusion_seg:
-            mbrain_seg.segment(outputDir, subID, preproc_suffix,
-                               shell_suffix, cpu_num=proc_num)
-
-        # Surface-based deformation cortical segmentation
-        # if cort_seg:
-        #    src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
-        #    tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
-        #    os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
-        #    mbrain_cort.generate_surfaces_from_dwi(outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir)
-        #    os.system('rm -r ' + tmp_freesurf_subdir)
+            meshDir, voxelDir = mbrain_segment.segment(outputDir, subID, preproc_suffix,
+                                   shell_suffix, cpu_num=proc_num)
+            
+            # Surface-based deformation cortical segmentation
+            # if cort_seg:
+            #    src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
+            #    tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
+            #    os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
+            #    mbrain_cort.generate_surfaces_from_dwi(outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir)
+            #    os.system('rm -r ' + tmp_freesurf_subdir)
 
     print("Total time for processing: ", time() - total_t_start)
     print("")
