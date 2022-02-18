@@ -13,6 +13,8 @@ import nibabel as nib
 from dipy.io import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
 import dipy.reconst.dti as dti
+
+from MicroBrain.surfing import mbrain_cortical_segmentation
 from MicroBrain.subcort_segmentation import mbrain_segment
 from MicroBrain.modelling import mbrain_modelling
 from MicroBrain.preprocessing import mbrain_preproc
@@ -564,12 +566,12 @@ def main(argv):
                                    shell_suffix, cpu_num=proc_num)
             
             # Surface-based deformation cortical segmentation
-            # if cort_seg:
-            #    src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
-            #    tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
-            #    os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
-            #    mbrain_cort.generate_surfaces_from_dwi(fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir)
-            #    os.system('rm -r ' + tmp_freesurf_subdir)
+            if cort_seg:
+                src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
+                tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
+                os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
+                mbrain_cortical_segmentation.generate_surfaces_from_dwi(fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num)
+                os.system('rm -r ' + tmp_freesurf_subdir)
 
     print("Total time for processing: ", time() - total_t_start)
     print("")
