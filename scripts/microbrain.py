@@ -86,9 +86,9 @@ def main(argv):
 
     --no-N4 - does not perform N4 correction (Tustison el al., 2010) via ANTS, useful flag when data is prescan normalized (Siemens)
     --no-json - if no .json image acquistion specification file available will run without this file
-    --mbrain-seg - perform surface based subcortical/cortical segmentation (Little et al., 2021, ISMRM and Little et al., 2021, NeuroImage) via MIRTK
-    --freesurf-dir - given a freesurfer subject directory use BBR to register T1 surfaces / segmentations to diffusion data and perform all analysis using these segmentations rather than segmenting on DTI itself. This assumes diffusion is in perfect alignment with the diffusion data (i.e. corrected for spatial distortions). Useful for lower resolution data where microbrain segmentation would fail.
-   
+    --mbrain-seg - perform surface based subcortical (Little et al., 2021, ISMRM) via MIRTK
+    --mbrain-cort - perform surface based cortex segmentation using DTI (Little et al., 2021, NeuroImage) via MIRTK
+    --use-tensor-wm - when performing wm/cortex segmentation use the tensor-based force + dwi and stop (i.e. do not refine surface on mean DWI only).  Useful when GM/WM contrast on mean DWI is poor.  Not necessary in high quality data such as HCP diffusion acquisitions.
     --cpu-num - number of cpus to use for nlsam denoising and surface-based subcortical/cortical segmentation (MIRTK) if not set will use defaults for those programs
 
     Examples Different Distortion Correction Methods:
@@ -104,23 +104,12 @@ def main(argv):
     3) Spatial Distortion Correction with siemens fieldmap data
     python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_fieldmap=[path_to_dicom_directory_with_magnitude_data, path_to_dicom_directory_with_phase_data, 2.46]
     python3 microbrain.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --AcqReadout=0.04999 --EffectiveEcho=0.00034 --all
-
-    Examples UofAlberta Data:
-    --cb - (used for CB_BRAIN data, no spatial distortion correction) 1) eddy_cuda 2) modelling tensor 3) subcortical segmentation 4) cortical segmentation 
-        python3 microbrain_setup.py -s somepath/CB_BRAIN_050 -i path_to_dicom_directory_containing_diffusion
-        python3 microbrain.py -s somepath/CB_BRAIN_050 -b [0,1000] --cb
-
-    --all - (used for ALB300 data, example below combines with fieldmap spatial distortion correction) 1) gibbs ringing correction 2) eddy_cuda 3) subcortical segmenation 4) cortical segmentation
-        python3 microbrain_setup.py -s somepath/AB300_005 -i Ab300_005/study/DTI_1p5mm...45b2500_12/ --idcm_fieldmap=[path_to_dicom_directory_with_magnitude_data, path_to_dicom_directory_with_phase_data, 2.46] 
-        python3 microbrain.py -s somepath/AB300_005 -b [0,1000] --pe_direction=AP --AcqReadout=0.04999 --EffectiveEcho=0.00034 --all
-    
-    --rerun-mask, --mask-params - used when masking fails and pipeline needs to be rerun 
-        python3 microbrain.py -s somepath/Ab300_0005 -b [0,1000] python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --all --mask-params=[0.4,0.1] --rerun-mask"""
+    """
 
     try:
         # Note some of these options were left for testing purposes
         opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=", "rerun-mask",
-                                   "dmppca", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize"])
+                                   "dmppca", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize","use-tensor-wm"])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -186,6 +175,8 @@ def main(argv):
             diffusion_seg = True
         elif opt in ("--mbrain-cort"):
             cort_seg = True
+        elif opt in ("--use-tensor-wm"):
+            use_tensor_wm = True
         elif opt in ("--freesurf-dir"):
             freesurfDir = os.path.normpath(arg)
         elif opt in ("--all"):
@@ -570,7 +561,10 @@ def main(argv):
                 src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
                 tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
                 os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
-                mbrain_cortical_segmentation.generate_surfaces_from_dwi(fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num)
+                if use_tensor_wm:
+                    mbrain_cortical_segmentation.generate_surfaces_from_dwi(fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num, use_tensor_wm=True)
+                else:
+                    mbrain_cortical_segmentation.generate_surfaces_from_dwi(fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num)
                 os.system('rm -r ' + tmp_freesurf_subdir)
 
     print("Total time for processing: ", time() - total_t_start)
