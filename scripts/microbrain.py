@@ -80,7 +80,7 @@ def main(argv):
     --gibbs - perform gibbs ringing correction (Kellner et al., 2016) using included third party c program
     --stabilize - perform stabilization using algorithm provided by non-local spatial angular matching algo (NLSAM, St Jean et al., 2016)
     --dnlsam - perform denoising using non-local spatial angular matching (NLSAM, St Jean et al., 2016)
-    --dnppca - performs MPPCA denoising (Veraart et al., 2016) via DIPY
+    --dmppca - performs MPPCA denoising (Veraart et al., 2016) via DIPY
     --eddy --eddy_cuda - performs eddy current correction (Anderson et al., 2016) via FSL v6.0 or higher. CUDA mode runs faster if CUDA setup on NVIDIA GPU
     
     --pe_direction=phase_encode_direction - direction of diffusion data in orig directory. phase_encode_direction can be LR for left/right or AP for anterior / posterior and their opposite pairs.  Required for distortion correction using a fieldmap or reverse phase encode data
