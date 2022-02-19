@@ -65,7 +65,7 @@ def main(argv):
     help_string = """usage: microbrain.py -s <Subject Directory> -b <bvaluelist> [options]
     description: microbrain is a fully automated diffusion MRI analysis pipeline for measurement of grey matter microstructure.  
     Note that options below require the installation of multiple neuroimaging/python analysis software packages (see install instructions).
-    VERY BETA Version use with extreme caution. For trouble shooting help contact Graham Little (gtlittle@ualberta.ca)
+    VERY BETA Version use with extreme caution. For trouble shooting help contact Graham Little (graham.little.phd@gmail.com)
 
     mandatory arguments:
     -s <directory>,--subdir= - specifies the directory which microbrain will place all processed files
@@ -177,7 +177,7 @@ def main(argv):
             cort_seg = True
         elif opt in ("--use-tensor-wm"):
             use_tensor_wm = True
-        elif opt in ("--freesurf-dir"):
+        elif opt in ("--freesurf-dir"): ## Not available currently
             freesurfDir = os.path.normpath(arg)
 
     outputDir, subID = os.path.split(outputDir)

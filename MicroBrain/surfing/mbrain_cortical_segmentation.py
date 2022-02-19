@@ -755,7 +755,7 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
         os.system('mirtk dilate-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a InitialStatus -n 5 ')
         os.system('mirtk erode-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a InitialStatus -n 6 ')
     else:
-        print("white surface already refined")
+        print("white surface already refined on tissue probability map")
 
     print("WM Surface with mean DWI with tensor-based force")
     wm_tensor_fname = wm_surf_fname.replace('.vtk', '_tensorBasedForce.vtk')
