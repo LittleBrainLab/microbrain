@@ -179,26 +179,6 @@ def main(argv):
             use_tensor_wm = True
         elif opt in ("--freesurf-dir"):
             freesurfDir = os.path.normpath(arg)
-        elif opt in ("--all"):
-            mask = True
-            gibbs = True
-            eddy = True
-            cuda = True
-            dti_model = True
-            diffusion_seg = True
-            N4 = True
-        elif opt in ("--cb"):
-            mask = True
-            eddy = True
-            cuda = True
-            dti_model = True
-            diffusion_seg = True
-            N4 = True
-        elif opt in ("--hcp"):
-            mask = True
-            dti_model = True
-            diffusion_seg = True
-            N4 = True
 
     outputDir, subID = os.path.split(outputDir)
     print('Processing:' + subID)
