@@ -58,6 +58,7 @@ def main(argv):
     dti_model = False
     diffusion_seg = False
     cort_seg = False
+    use_tensor_wm = False
     freesurfDir = False
     N4 = True  # By default do N4 correction on DWI image based on the bias field from b0
     cpu_num = 0
