@@ -608,7 +608,7 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
 
     return fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force
 
-def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix, shell_suffix, freesurf_subdir, cpu_num=0):
+def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix, shell_suffix, freesurf_subdir, cpu_num=0, use_tensor_wm=False):
     print("Surfing: " + thisSub)
     subDir = outDir + '/' + thisSub + '/'
     surfDir = subDir + 'surf/'
@@ -764,12 +764,15 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     else:
         print("white surface already generated with Tensor-Based Force")
     
-    print("Refining WM Surface with mean DWI only")
-    wm_final_fname = wm_surf_fname.replace('.vtk', '_final.vtk')
-    if not os.path.exists(wm_final_fname):
-        os.system('mirtk deform-mesh ' + wm_tensor_fname + ' ' + wm_final_fname + ' -image ' + fdwi_resamp + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
+    if use_tensor_wm:
+        wm_final_fname = wm_tensor_fname
     else:
-        print("white surface already refined on DWI")
+        print("Refining WM Surface with mean DWI only")
+        wm_final_fname = wm_surf_fname.replace('.vtk', '_final.vtk')
+        if not os.path.exists(wm_final_fname):
+            os.system('mirtk deform-mesh ' + wm_tensor_fname + ' ' + wm_final_fname + ' -image ' + fdwi_resamp + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
+        else:
+            print("white surface already refined on DWI")
 
     ## Move surface outward edge based on DWI and Tissue Classification Probability maps
     print("Expanding white surface Using GM/CSF Boundary Distance Map")
