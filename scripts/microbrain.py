@@ -33,6 +33,8 @@ def main(argv):
     outputDir = ''
     bval_list = []
 
+    # Default values for CL arguments
+
     # Three masking options
     bet_mask = False
     microbrain_mask = False
@@ -61,7 +63,7 @@ def main(argv):
     use_tensor_wm = False
     freesurfDir = False
     N4 = True  # By default do N4 correction on DWI image based on the bias field from b0
-    cpu_num = 0
+    proc_num = 0
 
     help_string = """usage: microbrain.py -s <Subject Directory> -b <bvaluelist> [options]
     description: microbrain is a fully automated diffusion MRI analysis pipeline for measurement of grey matter microstructure.  
