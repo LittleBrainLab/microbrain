@@ -706,8 +706,6 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
         vtk_pntList = numpy_to_vtk(rightLabels)
         vtk_pntList.SetName("HemiLabels")
         wm_rh_surf.GetPointData().AddArray(vtk_pntList)
-        
-        sutil.write_surf_vtk(wm_rh_surf, wm_rh_surf_fname.replace('.vtk','_test.vtk'))
 
         #combine left and right surfaces
         appender = vtk.vtkAppendPolyData()
