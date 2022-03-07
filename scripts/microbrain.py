@@ -542,7 +542,7 @@ def main(argv):
             # Surface-based deformation cortical segmentation
             if cort_seg:
                 src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
-                tmp_freesurf_subdir = '/usr/local/freesurfer/subjects/MBRAIN_' + subID + '/'
+                tmp_freesurf_subdir = os.environ['SUBJECTS_DIR'] +  '/MBRAIN_' + subID + '/'
                 os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
                 if use_tensor_wm:
                     mbrain_cortical_segmentation.generate_surfaces_from_dwi(fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num, use_tensor_wm=True)
