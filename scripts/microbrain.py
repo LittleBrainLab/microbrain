@@ -76,7 +76,6 @@ def main(argv):
 
     optional arguments: 
     --mask-params=[f-value,g-value], --- sets the bet2 mask parameters default [0.3,0.0]
-    --rerun-mask - deletes any previously created files (post-masking step) and reruns entire analysis using specified mask parameters 
     --gibbs - perform gibbs ringing correction (Kellner et al., 2016) using included third party c program
     --stabilize - perform stabilization using algorithm provided by non-local spatial angular matching algo (NLSAM, St Jean et al., 2016)
     --dnlsam - perform denoising using non-local spatial angular matching (NLSAM, St Jean et al., 2016)
@@ -142,8 +141,6 @@ def main(argv):
             mask = False
         elif opt in ("--explicit-mask"):
             explicit_mask = os.path.normpath(arg)
-        elif opt in ("--rerun-mask"):
-            rerun_mask = True
         elif opt in ("--stabilize"):
             stabilize = True
         elif opt in ("--dmppca"):
@@ -382,49 +379,6 @@ def main(argv):
                 acq = [0, 1, 0, acq_readout]
         acq = np.array(acq).T
         np.savetxt(facq, acq[None, :], fmt=('%01d', '%01d', '%01d', '%.6f'))
-
-    # if mask:
-        # If rerun mask flag, delete all data analyzed post mask and rerun all analysis
-    #    if rerun_mask:
-    #        for thisDir in [meanDWIDir, tensorDir, regDir, subcortDir, cortDir, preprocDir + 'eddy_output_files/']:
-    #            if os.path.exists(thisDir):
-    #                process = subprocess.run(['rm', '-r', thisDir], stdout=subprocess.PIPE, universal_newlines=True)
-    #
-    #        feddy = fout.replace(fsl_ext(), '_EDDY' + fsl_ext())
-    #        if os.path.exists(feddy):
-    #            process = subprocess.run(['rm', feddy], stdout=subprocess.PIPE, universal_newlines=True)
-    #            process = subprocess.run(['rm', feddy + '.eddy_rotated_bvecs'], stdout=subprocess.PIPE, universal_newlines=True)
-
-        #fmask = fout.replace(fsl_ext(), '_b0avg_BET_mask' + fsl_ext())
-        # if os.path.exists(fmask):
-        #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
-
-        # if topup:
-        #fbrain = ftopup_unwarped.replace(fsl_ext(), '_brain' + fsl_ext())
-        #fmask = ftopup_unwarped.replace(fsl_ext(), '_brain_mask' + fsl_ext())
-        # if os.path.exists(fmask):
-        #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
-
-        #process = subprocess.run(['bet',ftopup_unwarped, fbrain, '-m','-f', str(fval)], stdout=subprocess.PIPE, universal_newlines=True)
-        #fmask, fb0avg, stdout, returncode = mbrain_preproc.fslv6p0_brain_mask(ftopup_unwarped,np.zeros((b0_data.shape[3],)),fval,gval)
-        # else:
-        #fbrain = ffirstb0.replace(fsl_ext(), '_brain' + fsl_ext())
-        #fmask = ffirstb0.replace(fsl_ext(), '_brain_mask' + fsl_ext())
-        # if os.path.exists(fmask):
-        #    process = subprocess.run(['rm', fmask], stdout=subprocess.PIPE, universal_newlines=True)
-
-        #process = subprocess.run(['bet',ffirstb0, fbrain, '-m','-f', str(fval)], stdout=subprocess.PIPE, universal_newlines=True)
-        #fmask, fb0avg, stdout, returncode = mbrain_preproc.fslv6p0_brain_mask(fb0s,np.zeros((b0_data.shape[3],)),fval,gval)
-
-        # if returncode != 0:
-        #    print('DSurfer: bet2 returned an error, make sure it is installed correctly')
-        #    sys.exit()
-    # else:
-    #    # TODO Test this pipeline
-    #    if topup:
-    #        fmask, fb0avg = mbrain_preproc.fslv6p0_fake_brain_mask(ftopup_unwarped,np.zeros((b0_data.shape[3],)))
-    #    else:
-    #        fmask, fb0avg = mbrain_preproc.fslv6p0_fake_brain_mask(fb0s,np.zeros((b0_data.shape[3],)))
 
     # Eddy current correction
     if eddy:
