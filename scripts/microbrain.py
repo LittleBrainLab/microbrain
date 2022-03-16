@@ -224,7 +224,7 @@ def main(argv):
             sys.exit()
 
         topup = True
-
+    
     fdwi = origDir + subID + fsl_ext()
     fbval = fdwi.replace(fsl_ext(), '.bval')
     fbvec = fdwi.replace(fsl_ext(), '.bvec')
@@ -356,6 +356,14 @@ def main(argv):
         first_reverseb0 = np.where(b0_pe_direction == 1)[0]
         index[pe_direction_ind == 1] = first_reverseb0[0] + 1
         np.savetxt(findex, index, delimiter='', newline=' ', fmt='%01d')
+
+        # output b0s
+        fb0s = fout.replace(fsl_ext(), '_b0vols' + fsl_ext())
+        dwi_img = nib.load(fout)
+        dwi_vol = dwi_img.get_fdata()
+        b0_vols = dwi_vol[:,:,:,np.logical_and(
+            bvals >= -20, bvals <= 20)]
+        nib.save(nib.Nifti1Image(b0_vols, dwi_img.affine), fb0s)
 
         ftopup, ftopup_unwarped, stdout, returncode = mbrain_preproc.fslv6p0_topup(
             fb0s, facq)

@@ -16,8 +16,6 @@ from dipy.io import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
 
 # Check to see if program is installed to path and executable before running subprocess
-
-
 def is_tool(name):
     return which(name) is not None
 
@@ -98,6 +96,7 @@ def main(argv):
     smooth_radius = 0
     input_fieldmap = ''
     input_reverse_pe = ''
+    make_bfiles=False
 
     help_string = """usage: microbrain_setup.py -s <Subject Directory> [options]
     description: microbrain_setup.py creates the subject data directory for downstream processing from a microbrain.py call. 
@@ -118,6 +117,8 @@ def main(argv):
     
     --idcm_fieldmap=[dicom_magnitude, dicom_phase, TE_difference] - uses dcm2niix to convert reverse phase encode dicom to NIFTI, calculates fieldmap (in hz) from magnitude/phase images and stores in "orig_fieldmap" folder. TE_difference is the difference in TE between first and second images, in default siemens sequence this value is usually 2.46 ms
     
+    --make_bfiles - if bval/bvec files are not generated in conversion step, assume only b0s and make bval/bvec files
+
     Examples Different Distortion Correction:
 
     1) No spatial distortion correction, b1000
@@ -136,7 +137,7 @@ def main(argv):
     try:
         # Note some of these options were left for testing purposes
         opts, args = getopt.getopt(argv, "hs:i:", [
-                                   "idcm=", "idcm_reversePE=", "idcm_fieldmap=", "idcm_fieldmap_smooth="])
+                                   "idcm=", "idcm_reversePE=", "idcm_fieldmap=", "idcm_fieldmap_smooth=", "make_bfiles"])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -165,6 +166,8 @@ def main(argv):
             fieldmap_echo_diff = fieldmap_list[2]
         elif opt in ("--idcm_fieldmap_smooth"):
             smooth_radius = int(arg)
+        elif opt in ("--make_bfiles"):
+            make_bfiles=True
 
     outputDir, subID = os.path.split(outputDir)
     print('Setting Up:' + subID)
@@ -199,6 +202,20 @@ def main(argv):
             print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
             sys.exit()
         origDir_reversePE = outputDir + '/' + subID + '/orig_reversePE/'
+
+        # generate reverse PE bval/bvec files if only b0s
+        if make_bfiles: 
+            print("Made it here!")
+            reversePE_data = nib.load(fdwi_reversePE).get_fdata()
+            if not os.path.exists(fbval_reversePE):
+                print('MicroBrain: no bval file found, assuming reverse PE file are only b0 volumes')
+                reversePE_bvals = np.zeros((1, reversePE_data.shape[3]))
+                np.savetxt(fbval_reversePE, reversePE_bvals, fmt="%d")
+
+            if make_bfiles and not os.path.exists(fbvec_reversePE):
+                print('MicroBrain: no bval file found, assuming reverse PE file are only b0 volumes')
+                reversePE_bvec = np.zeros((3, reversePE_data.shape[3]))
+                np.savetxt(fbvec_reversePE, reversePE_bvec, fmt="%d")
 
         # Merge nifti
         fdwi_merge = outputDir + '/' + subID + '/orig/' + subID + fsl_ext()
