@@ -880,8 +880,6 @@ def segment(procDir, subID, preproc_suffix, shell_suffix, cpu_num=0):
     segDir = subDir + '/subcortical_segmentation/'
     regDir = subDir + '/registration/'
 
-    print(preproc_suffix)
-    print(shell_suffix)
     if preproc_suffix == '':
         suffix = '_' + shell_suffix
         fdwi = subDir + '/meanDWI/' + subID + '_mean_b1000_n4' + fsl_ext()
