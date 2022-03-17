@@ -882,9 +882,12 @@ def segment(procDir, subID, preproc_suffix, shell_suffix, cpu_num=0):
 
     if preproc_suffix == '':
         suffix = '_' + shell_suffix
+        #fdwi = subDir + '/meanDWI/' + subID + '_mean_b1500_n4' + fsl_ext()
         fdwi = subDir + '/meanDWI/' + subID + '_mean_b1000_n4' + fsl_ext()
     else:
         suffix = '_' + preproc_suffix + '_' + shell_suffix
+        #fdwi = subDir + '/meanDWI/' + subID + '_' + \
+        #    preproc_suffix + '_mean_b1500_n4' + fsl_ext()
         fdwi = subDir + '/meanDWI/' + subID + '_' + \
             preproc_suffix + '_mean_b1000_n4' + fsl_ext()
 

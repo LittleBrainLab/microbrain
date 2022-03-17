@@ -209,12 +209,19 @@ def main(argv):
             reversePE_data = nib.load(fdwi_reversePE).get_fdata()
             if not os.path.exists(fbval_reversePE):
                 print('MicroBrain: no bval file found, assuming reverse PE file are only b0 volumes')
-                reversePE_bvals = np.zeros((1, reversePE_data.shape[3]))
+                if len(reversePE_data.shape) == 3:
+                    reversePE_bvals =np.zeros((1,1))
+                else:
+                    reversePE_bvals = np.zeros((1, reversePE_data.shape[3]))
                 np.savetxt(fbval_reversePE, reversePE_bvals, fmt="%d")
 
             if make_bfiles and not os.path.exists(fbvec_reversePE):
                 print('MicroBrain: no bval file found, assuming reverse PE file are only b0 volumes')
-                reversePE_bvec = np.zeros((3, reversePE_data.shape[3]))
+                
+                if len(reversePE_data.shape) == 3:
+                    reversePE_bvec =np.zeros((3,1))
+                else:
+                    reversePE_bvec = np.zeros((3, reversePE_data.shape[3]))
                 np.savetxt(fbvec_reversePE, reversePE_bvec, fmt="%d")
 
         # Merge nifti
