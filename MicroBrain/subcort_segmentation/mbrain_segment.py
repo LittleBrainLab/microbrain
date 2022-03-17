@@ -880,13 +880,16 @@ def segment(procDir, subID, preproc_suffix, shell_suffix, cpu_num=0):
     segDir = subDir + '/subcortical_segmentation/'
     regDir = subDir + '/registration/'
 
+    print(preproc_suffix)
+    print(shell_suffix)
     if preproc_suffix == '':
         suffix = '_' + shell_suffix
+        fdwi = subDir + '/meanDWI/' + subID + '_mean_b1000_n4' + fsl_ext()
     else:
         suffix = '_' + preproc_suffix + '_' + shell_suffix
+        fdwi = subDir + '/meanDWI/' + subID + '_' + \
+            preproc_suffix + '_mean_b1000_n4' + fsl_ext()
 
-    fdwi = subDir + '/meanDWI/' + subID + '_' + \
-        preproc_suffix + '_mean_b1000_n4' + fsl_ext()
     ffa = subDir + '/DTI_maps/' + subID + suffix + '_FA' + fsl_ext()
     fmd = subDir + '/DTI_maps/' + subID + suffix + '_MD' + fsl_ext()
 
