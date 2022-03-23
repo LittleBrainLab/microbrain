@@ -302,7 +302,9 @@ def main(argv):
         nib.save(nib.Nifti1Image(fake_mask_data, fout_img.affine), fmask)
 
     # Signal stabilization and/or denoising with NLSAM (automatic estimates for N and sigma via st-jean 2020, Medical Image Analysis)
-    if dnlsam:
+    if dnlsam and os.path.exists(reverseDir):
+        print("Performing NLSAM denoising after topup/eddy correction")
+    elif dnlsam:
         fout = mbrain_preproc.denoiseNLSAM(
             fout, fmask, fbval, fbvec, preprocDir, cpu_num=proc_num)
         preproc_suffix = preproc_suffix + '_DNLSAM'
@@ -459,6 +461,12 @@ def main(argv):
         bvals, bvecs = read_bvals_bvecs(fbval, fbvec_rotated)
 
         preproc_suffix = preproc_suffix + '_EDDY'
+
+    # If reverse phase encode detected perform denoising after eddy
+    if dnlsam and os.path.exists(reverseDir):
+        fout = mbrain_preproc.denoiseNLSAM(
+            fout, fmask, fbval, fbvec, preprocDir, cpu_num=proc_num)
+        preproc_suffix = preproc_suffix + '_DNLSAM'
 
     # Remove preceding _
     if preproc_suffix != '':
