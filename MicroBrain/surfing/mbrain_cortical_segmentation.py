@@ -601,12 +601,13 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
     # Output tensor based force map 
     ftb_force = surfDir + thisSub + suffix + '_tensor-based-force' + fsl_ext()
     force_data = -fa_data + fa_target
+    force_data[csf_prob > 0.5] = csf_prob[csf_prob > 0.5]
     force_data[wm_dist == -1] = -1.0 
     force_data[external_mask == 1] == 1.0
     force_data[inter_mask == 0] = -1.0
     nib.save(nib.Nifti1Image(force_data, new_affine), ftb_force)
 
-    return fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force
+    return fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fcsf_prob
 
 def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix, shell_suffix, freesurf_subdir, cpu_num=0, use_tensor_wm=False):
     print("Surfing: " + thisSub)
@@ -631,7 +632,7 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
 
     wm_surf_fname = surfDir + thisSub + suffix + '_wm.vtk'
     
-    wm_lh_fname, wm_rh_fname, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force = generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, surfDir, cpu_num=cpu_num)
+    wm_lh_fname, wm_rh_fname, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fcsf_prob = generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, surfDir, cpu_num=cpu_num)
 
     if not os.path.exists(wm_surf_fname):
 
