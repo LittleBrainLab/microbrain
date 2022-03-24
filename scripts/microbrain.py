@@ -224,7 +224,7 @@ def main(argv):
             sys.exit()
 
         topup = True
-
+    
     fdwi = origDir + subID + fsl_ext()
     fbval = fdwi.replace(fsl_ext(), '.bval')
     fbvec = fdwi.replace(fsl_ext(), '.bvec')
@@ -302,7 +302,9 @@ def main(argv):
         nib.save(nib.Nifti1Image(fake_mask_data, fout_img.affine), fmask)
 
     # Signal stabilization and/or denoising with NLSAM (automatic estimates for N and sigma via st-jean 2020, Medical Image Analysis)
-    if dnlsam:
+    if dnlsam and os.path.exists(reverseDir):
+        print("Performing NLSAM denoising after topup/eddy correction")
+    elif dnlsam:
         fout = mbrain_preproc.denoiseNLSAM(
             fout, fmask, fbval, fbvec, preprocDir, cpu_num=proc_num)
         preproc_suffix = preproc_suffix + '_DNLSAM'
@@ -356,6 +358,14 @@ def main(argv):
         first_reverseb0 = np.where(b0_pe_direction == 1)[0]
         index[pe_direction_ind == 1] = first_reverseb0[0] + 1
         np.savetxt(findex, index, delimiter='', newline=' ', fmt='%01d')
+
+        # output b0s
+        fb0s = fout.replace(fsl_ext(), '_b0vols' + fsl_ext())
+        dwi_img = nib.load(fout)
+        dwi_vol = dwi_img.get_fdata()
+        b0_vols = dwi_vol[:,:,:,np.logical_and(
+            bvals >= -20, bvals <= 20)]
+        nib.save(nib.Nifti1Image(b0_vols, dwi_img.affine), fb0s)
 
         ftopup, ftopup_unwarped, stdout, returncode = mbrain_preproc.fslv6p0_topup(
             fb0s, facq)
@@ -451,6 +461,12 @@ def main(argv):
         bvals, bvecs = read_bvals_bvecs(fbval, fbvec_rotated)
 
         preproc_suffix = preproc_suffix + '_EDDY'
+
+    # If reverse phase encode detected perform denoising after eddy
+    if dnlsam and os.path.exists(reverseDir):
+        fout = mbrain_preproc.denoiseNLSAM(
+            fout, fmask, fbval, fbvec, preprocDir, cpu_num=proc_num)
+        preproc_suffix = preproc_suffix + '_DNLSAM'
 
     # Remove preceding _
     if preproc_suffix != '':
