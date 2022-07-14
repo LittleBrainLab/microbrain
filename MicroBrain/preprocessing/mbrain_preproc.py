@@ -484,7 +484,7 @@ def output_DWI_maps(fb0avg, fmask, feddy, bvals, shells, meanDWIDir, preproc_suf
                 process = subprocess.run(['fslcpgeom', fb0avg, fmask], stdout=subprocess.PIPE, universal_newlines=True)
                 process = subprocess.run(['N4BiasFieldCorrection',
                                 '-i', fb0avg,
-                                '-x',fmask,
+                                '-x', fmask,
                                 '-o', '[' + fn4correct + ',' + fbias + ']','-v'],
                             stdout=subprocess.PIPE,
                             universal_newlines=True)

@@ -85,7 +85,7 @@ def write_image(image,header,sformMat,fname):
     writer.SetFileName(fname)
     writer.SetNIFTIHeader(header)
     #writer.SetSFormMatrix(sformMat.GetMatrix())
-    writer.SetQFac(-1) # TODO: Still unsure why I have to do this but will keep doing it until it doesn't work
+    #writer.SetQFac(-1) # TODO: Still unsure why I have to do this but will keep doing it until it doesn't work
     
     writer.Write()
 
@@ -99,7 +99,7 @@ def write_image(image,header,sformMat,fname):
 def surf_to_volume_mask(fdwi,fmesh,inside_val,fout):
     ##Transform the vtk mesh to native space
     surfVTK = read_surf_vtk(fmesh)
-    vtkImage, vtkHeader,sformMat = read_image(fdwi)
+    vtkImage, vtkHeader, sformMat = read_image(fdwi)
     sformInv = vtk.vtkTransform()
     sformInv.DeepCopy(sformMat)
     sformInv.Inverse()
