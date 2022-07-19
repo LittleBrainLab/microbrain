@@ -34,13 +34,34 @@ def fsl_ext():
 
 def export_wm_mask(subID, segDir, surfDir, dtiDir, outFile):
 
-    # Convert wm mesh to mask
+    # Convert LH and RH wm mesh to mask
     fdwi = segDir + '/voxel_output/' + subID + '_refined_LEFT_STRIATUM' + fsl_ext()  
-    fwmsurf = surfDir + '/' + subID + '_b0b1000_wm_final.vtk'
-    sutil.surf_to_volume_mask(fdwi, fwmsurf, 1, outFile)
+    
+    # LH WM to mask
+    flh_wmsurf = surfDir + '/' + subID + '_b0b1000_wm_final_lh.vtk'
+    flh_out = flh_wmsurf.replace('.vtk', '_mask.nii.gz')
+    sutil.surf_to_volume_mask(fdwi, flh_wmsurf, 1, flh_out)
 
-    wm_img = nib.load(outFile)
-    wm_data = wm_img.get_data()
+    # RH WM to mask
+    frh_wmsurf = surfDir + '/' + subID + '_b0b1000_wm_final_rh.vtk'
+    frh_out = frh_wmsurf.replace('.vtk', '_mask.nii.gz')
+    sutil.surf_to_volume_mask(fdwi, frh_wmsurf, 1, frh_out)
+
+    # Fill in midline
+    lh_wm_img = nib.load(flh_out)
+    lh_wm_mask = lh_wm_img.get_data() == 1
+    lh_shifted = np.roll(lh_wm_mask, -2, axis=0)
+
+    rh_wm_img = nib.load(frh_out)
+    rh_wm_mask = rh_wm_img.get_data() == 1
+    rh_shifted = np.roll(rh_wm_mask, 2, axis=0)
+
+    wm_intersect = np.logical_and(lh_shifted, rh_shifted)
+
+    wm_data = np.zeros(lh_wm_mask.shape)
+    wm_data[lh_wm_mask] = 1
+    wm_data[rh_wm_mask] = 1
+    wm_data[wm_intersect] = 1
 
     exclude_label = ['LEFT_THALAMUS', 'RIGHT_THALAMUS', 
                     'LEFT_STRIATUM', 'RIGHT_STRIATUM',  
@@ -61,7 +82,7 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, outFile):
 
     wm_data[md_data > 0.0015] =  0
 
-    nib.save(nib.Nifti1Image(wm_data, wm_img.affine) , outFile)
+    nib.save(nib.Nifti1Image(wm_data, lh_wm_img.affine), outFile)
 
     return
 
