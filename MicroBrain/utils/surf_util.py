@@ -84,8 +84,14 @@ def write_image(image,header,sformMat,fname):
     writer.SetInputData(image)
     writer.SetFileName(fname)
     writer.SetNIFTIHeader(header)
-    #writer.SetSFormMatrix(sformMat.GetMatrix())
-    writer.SetQFac(-1) # TODO: Still unsure why I have to do this but will keep doing it until it doesn't work
+    
+    # For some reason vtk writer ignores PixDim[0] if set to -1 causing output to flip
+    if header.GetPixDim(0) == -1:
+        writer.SetQFac(-1) 
+    elif header.GetPixDim(0) == 1:
+        writer.SetQFac(1)
+    else:
+        writer.SetQFac(1)
     
     writer.Write()
 
@@ -96,10 +102,25 @@ def write_image(image,header,sformMat,fname):
 
     return
 
-def surf_to_volume_mask(fdwi,fmesh,inside_val,fout):
-    ##Transform the vtk mesh to native space
+def surf_to_volume_mask(fdwi, fmesh, inside_val, fout):
+    """
+    Outputs a voxel label for a given 3D mesh, label includes all voxels whose center is within the mesh
+
+    Parameters
+    ----------
+    fdwi: filename for 3Dnifti file which defines the voxel grid for the label
+    fmesh: vtk file for the mesh that will be converted to a voxel label
+    inside_val: integer value assigned to the voxel label
+    fout: output nifti file containing the label
+
+    Returns
+    -------
+    None
+    """
+
+    # Transform the vtk mesh to native space
     surfVTK = read_surf_vtk(fmesh)
-    vtkImage, vtkHeader,sformMat = read_image(fdwi)
+    vtkImage, vtkHeader, sformMat = read_image(fdwi)
     sformInv = vtk.vtkTransform()
     sformInv.DeepCopy(sformMat)
     sformInv.Inverse()
@@ -130,7 +151,7 @@ def surf_to_volume_mask(fdwi,fmesh,inside_val,fout):
 
     out_image = imgstenc.GetOutput()
 
-    write_image(out_image, vtkHeader,sformMat, fout)
+    write_image(out_image, vtkHeader, sformMat, fout)
 
     return
 

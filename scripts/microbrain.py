@@ -482,15 +482,20 @@ def main(argv):
             fout, fmask, bvals, bvecs, tensorDir, shells=bval_list)
 
         # Output first b0 for N4 correction
-        fout_img = nib.load(fout)
-        fout_data = fout_img.get_data()
-
-        b0_data = fout_data[:, :, :, np.logical_and(bvals >= -20, bvals <= 20)]
-
-        firstb0_data = b0_data[:, :, :, 0]
         ffirstb0_undistort = fout.replace(fsl_ext(), '_firstb0' + fsl_ext())
-        nib.save(nib.Nifti1Image(firstb0_data,
-                 fout_img.affine), ffirstb0_undistort)
+        if not os.path.exists(ffirstb0_undistort):
+            fout_img = nib.load(fout)
+            fout_data = fout_img.get_data()
+
+            b0_data = fout_data[:, :, :, np.logical_and(bvals >= -20, bvals <= 20)]
+
+            firstb0_data = b0_data[:, :, :, 0]
+            
+            nib.save(nib.Nifti1Image(firstb0_data,
+                    fout_img.affine), ffirstb0_undistort)
+            
+            fout_img.uncache()
+            del fout_data
 
         # Output Average DWI maps for each shell, as well as N4 corrected versions. Note, N4 correction applied to mean DWI not to the raw data itself)
         if N4:

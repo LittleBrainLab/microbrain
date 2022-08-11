@@ -284,62 +284,6 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
 # move to surf_util.py
 
 
-def surf_to_volume_mask(fdwi, fmesh, inside_val, fout):
-    """
-    Outputs a voxel label for a given 3D mesh, label includes all voxels whose center is within the mesh
-
-    Parameters
-    ----------
-    fdwi: filename for 3Dnifti file which defines the voxel grid for the label
-    fmesh: vtk file for the mesh that will be converted to a voxel label
-    inside_val: integer value assigned to the voxel label
-    fout: output nifti file containing the label
-
-    Returns
-    -------
-    None
-    """
-
-    # Transform the vtk mesh to native space
-    surfVTK = sutil.read_surf_vtk(fmesh)
-    vtkImage, vtkHeader, sformMat = sutil.read_image(fdwi)
-    sformInv = vtk.vtkTransform()
-    sformInv.DeepCopy(sformMat)
-    sformInv.Inverse()
-    sformInv.Update()
-
-    transformPD = vtk.vtkTransformPolyDataFilter()
-    transformPD.SetTransform(sformInv)
-    transformPD.SetInputData(surfVTK)
-    transformPD.Update()
-    surfVTK_voxel = transformPD.GetOutput()
-
-    # Fill image with inside_val
-    vtkImage.GetPointData().GetScalars().Fill(inside_val)
-
-    pol2stenc = vtk.vtkPolyDataToImageStencil()
-    pol2stenc.SetInputData(surfVTK_voxel)
-    pol2stenc.SetOutputOrigin(vtkImage.GetOrigin())
-    pol2stenc.SetOutputSpacing(vtkImage.GetSpacing())
-    pol2stenc.SetOutputWholeExtent(vtkImage.GetExtent())
-    pol2stenc.Update()
-
-    imgstenc = vtk.vtkImageStencil()
-    imgstenc.SetInputData(vtkImage)
-    imgstenc.SetStencilConnection(pol2stenc.GetOutputPort())
-    imgstenc.ReverseStencilOff()
-    imgstenc.SetBackgroundValue(0)
-    imgstenc.Update()
-
-    out_image = imgstenc.GetOutput()
-
-    sutil.write_image(out_image, vtkHeader, sformMat, fout)
-
-    return
-
-# move to surf_util.py
-
-
 def extract_surfaces_from_labels(flabels, label_list, outDir, fout_prefix):
     """
     Given a 3D nifti file containing a voxelwise labeling of structures, output a smoothed 3D surface representation of the labels
@@ -492,7 +436,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         if not path.exists(fglobus_lh_refined):
             system('mirtk deform-mesh ' + fglobus_lh + ' ' + fglobus_lh_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglob_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(
                 step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
-            surf_to_volume_mask(fdwi, fglobus_lh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fglobus_lh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_LEFT_GLOBUS' + fsl_ext())
 
         fglobus_rh = initSegDir + subID + initial_seg_prefix + '_RIGHT_GLOBUS.vtk'
@@ -500,7 +444,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         if not path.exists(fglobus_rh_refined):
             system('mirtk deform-mesh ' + fglobus_rh + ' ' + fglobus_rh_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fglob_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
-            surf_to_volume_mask(fdwi, fglobus_rh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fglobus_rh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_RIGHT_GLOBUS' + fsl_ext())
 
         # Generate map for Striatum deformation
@@ -542,7 +486,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         if not path.exists(fstriatum_lh_refined):
             system('mirtk deform-mesh ' + fstriatum_lh + ' ' + fstriatum_lh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1  -distance-image ' + fstriatum_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.3')
-            surf_to_volume_mask(fdwi, fstriatum_lh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fstriatum_lh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_LEFT_STRIATUM' + fsl_ext())
 
         fstriatum_rh = initSegDir + subID + initial_seg_prefix + '_RIGHT_STRIATUM.vtk'
@@ -550,7 +494,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         if not path.exists(fstriatum_rh_refined):
             system('mirtk deform-mesh ' + fstriatum_rh + ' ' + fstriatum_rh_refined + ' -image ' + fmd_plusFA_globus + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1  -distance-image ' + fstriatum_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength) + ' -edge-distance-min-intensity 0.3')
-            surf_to_volume_mask(fdwi, fstriatum_rh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fstriatum_rh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_RIGHT_STRIATUM' + fsl_ext())
 
         fa_md_striatum = np.zeros(MD_plusFA_data.shape)
@@ -599,13 +543,13 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         fthalamus_lh_refined = meshDir + subID + seg_prefix + '_LEFT_THALAMUS.vtk'
         if not path.exists(fthalamus_lh_refined):
             sutil.write_surf_vtk(lh_thalamus, fthalamus_lh_refined)
-            surf_to_volume_mask(fdwi, fthalamus_lh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fthalamus_lh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_LEFT_THALAMUS' + fsl_ext())
 
         fthalamus_rh_refined = meshDir + subID + seg_prefix + '_RIGHT_THALAMUS.vtk'
         if not path.exists(fthalamus_rh_refined):
             sutil.write_surf_vtk(rh_thalamus, fthalamus_rh_refined)
-            surf_to_volume_mask(fdwi, fthalamus_rh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fthalamus_rh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_RIGHT_THALAMUS' + fsl_ext())
 
         # Hippocampus/Amygdala segmentation
@@ -631,7 +575,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         if not path.exists(fhippoamyg_lh_refined):
             system('mirtk deform-mesh ' + fhippoamyg_lh + ' ' + fhippoamyg_lh_refined + ' -image ' + fmd_plusFA + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
-            surf_to_volume_mask(fdwi, fhippoamyg_lh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fhippoamyg_lh_refined, 1,
                                 atroposDir + subID + seg_prefix + '_LEFT_HIPPOAMYG' + fsl_ext())
 
         fhippoamyg_rh = initSegDir + subID + initial_seg_prefix + '_RIGHT_HIPPOAMYG.vtk'
@@ -639,7 +583,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
         if not path.exists(fhippoamyg_rh_refined):
             system('mirtk deform-mesh ' + fhippoamyg_rh + ' ' + fhippoamyg_rh_refined + ' -image ' + fmd_plusFA + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fhipamyg_prob_force + ' -distance 0.25 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(step_num) +
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
-            surf_to_volume_mask(fdwi, fhippoamyg_rh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fhippoamyg_rh_refined, 1,
                                 atroposDir + subID + seg_prefix + '_RIGHT_HIPPOAMYG' + fsl_ext())
 
         # Run 3 channel tissue segmentation to separate amygdala from hippocampus
@@ -770,7 +714,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
             system('mirtk project-onto-surface ' + famyg_lh_refined + ' ' + famyg_lh_refined +
                 ' -constant ' + str(LEFT_AMYG_IDX) + ' -pointdata -name struct_label')
-            surf_to_volume_mask(fdwi, famyg_lh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, famyg_lh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_LEFT_AMYGDALA' + fsl_ext())
 
         famyg_rh_refined = meshDir + subID + seg_prefix + '_RIGHT_AMYGDALA.vtk'
@@ -779,7 +723,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
             system('mirtk project-onto-surface ' + famyg_rh_refined + ' ' + famyg_rh_refined +
                 ' -constant ' + str(RIGHT_AMYG_IDX) + ' -pointdata -name struct_label')
-            surf_to_volume_mask(fdwi, famyg_rh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, famyg_rh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_RIGHT_AMYGDALA' + fsl_ext())
 
         # Build amygdala prob force
@@ -821,7 +765,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
             system('mirtk project-onto-surface ' + fhippo_lh_refined + ' ' + fhippo_lh_refined +
                 ' -constant ' + str(LEFT_HIPPO_IDX) + ' -pointdata -name struct_label')
-            surf_to_volume_mask(fdwi, fhippo_lh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fhippo_lh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_LEFT_HIPPO' + fsl_ext())
 
         fhippo_rh_refined = meshDir + subID + seg_prefix + '_RIGHT_HIPPO.vtk'
@@ -830,7 +774,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
                 ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_hippo_edgelength) + ' -max-edge-length ' + str(max_hippo_edgelength) + ' -edge-distance-min-intensity 1.0')
             system('mirtk project-onto-surface ' + fhippo_rh_refined + ' ' + fhippo_rh_refined +
                 ' -constant ' + str(RIGHT_HIPPO_IDX) + ' -pointdata -name struct_label')
-            surf_to_volume_mask(fdwi, fhippo_rh_refined, 1,
+            sutil.surf_to_volume_mask(fdwi, fhippo_rh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_RIGHT_HIPPO' + fsl_ext())
 
         # Append subcort surfs together into single vtk file
