@@ -84,8 +84,14 @@ def write_image(image,header,sformMat,fname):
     writer.SetInputData(image)
     writer.SetFileName(fname)
     writer.SetNIFTIHeader(header)
-    #writer.SetSFormMatrix(sformMat.GetMatrix())
-    #writer.SetQFac(-1) # TODO: Still unsure why I have to do this but will keep doing it until it doesn't work
+    
+    # For some reason vtk writer ignores PixDim[0] if set to -1 causing output to flip
+    if header.PixDim[0] == -1:
+        writer.SetQFac(-1) 
+    elif header.PixDim[0] == 1:
+        writer.SetQFac(1)
+    else:
+        writer.SetQFac(1)
     
     writer.Write()
 
