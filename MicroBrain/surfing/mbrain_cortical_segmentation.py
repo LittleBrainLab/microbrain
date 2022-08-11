@@ -2,7 +2,7 @@ from asyncio import subprocess
 import numpy as np
 import nibabel as nib
 import MicroBrain.utils.surf_util as sutil
-from MicroBrain.subcort_segmentation.mbrain_segment import register_probatlas_to_native, surf_to_volume_mask
+from MicroBrain.subcort_segmentation.mbrain_segment import register_probatlas_to_native
 
 from dipy.align.reslice import reslice
 from scipy.ndimage.morphology import binary_fill_holes
