@@ -32,7 +32,7 @@ def fsl_ext():
     return fsl_extension
 
 
-def export_wm_mask(subID, segDir, surfDir, dtiDir, outFile):
+def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
 
     # Convert LH and RH wm mesh to mask
     fdwi = segDir + '/voxel_output/' + subID + '_refined_LEFT_STRIATUM' + fsl_ext()  
@@ -63,6 +63,21 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, outFile):
     wm_data[rh_wm_mask] = 1
     wm_data[wm_intersect] = 1
 
+    # Include brainstem WM and cerrebellum WM
+    ftissue = surfDir + '/tissue_classification/tissue_prob_' + subID + '_out_seg.nii.gz'
+    tissue_seg = nib.load(ftissue).get_data()
+    fharvard_reg = regDir + '/HarvardOxford-sub-prob-1mm_ANTsReg_native.nii.gz'
+    harvard_prob = nib.load(fharvard_reg).get_data()
+    fmni_reg = regDir + '/MNI-prob-1mm_ANTsReg_native.nii.gz'
+    mni_prob = nib.load(fmni_reg).get_data()
+
+    stem_ind = 7
+    cb_ind = 1
+    cb_stem_mask = np.logical_or(harvard_prob[:,:,:,stem_ind] > 0, mni_prob[:,:,:,cb_ind] > 0)
+    wm_cb_stem_mask = np.logical_and(tissue_seg == 2, cb_stem_mask)
+    wm_data[wm_cb_stem_mask] = 1
+
+    # Exclude subcortical GM
     exclude_label = ['LEFT_THALAMUS', 'RIGHT_THALAMUS', 
                     'LEFT_STRIATUM', 'RIGHT_STRIATUM',  
                     'LEFT_GLOBUS', 'RIGHT_GLOBUS',
@@ -127,7 +142,8 @@ def main(argv):
     segDir = baseDir + '/' + subID + '/subcortical_segmentation/'
     surfDir = baseDir + '/' + subID + '/surf/'
     dtiDir = baseDir + '/' + subID + '/DTI_maps/'
-    export_wm_mask(subID, segDir, surfDir, dtiDir, outfile)
+    regDir = baseDir + '/' + subID + '/registration/'
+    export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outfile)
     
 if __name__ == "__main__":
     main(sys.argv[1:])
