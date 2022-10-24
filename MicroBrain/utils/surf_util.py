@@ -91,7 +91,7 @@ def write_image(image,header,sformMat,fname):
     elif header.GetPixDim(0) == 1:
         writer.SetQFac(1)
     else:
-        writer.SetQFac(1)
+        writer.SetQFac(-1)
     
     writer.Write()
 

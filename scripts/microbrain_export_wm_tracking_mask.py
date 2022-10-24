@@ -16,6 +16,8 @@ from dipy.core.gradients import gradient_table
 
 from MicroBrain.utils import surf_util as sutil
 
+from scipy.ndimage import binary_fill_holes
+
 # Check to see if program is installed to path and executable before running subprocess
 
 
@@ -75,8 +77,8 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
     cb_ind = 1
     cb_stem_mask = np.logical_or(harvard_prob[:,:,:,stem_ind] > 0, mni_prob[:,:,:,cb_ind] > 0)
     wm_cb_stem_mask = np.logical_and(tissue_seg == 2, cb_stem_mask)
-    wm_data[wm_cb_stem_mask] = 1
-
+    wm_data[binary_fill_holes(wm_cb_stem_mask)] = 1
+    
     # Exclude subcortical GM
     exclude_label = ['LEFT_THALAMUS', 'RIGHT_THALAMUS', 
                     'LEFT_STRIATUM', 'RIGHT_STRIATUM',  
