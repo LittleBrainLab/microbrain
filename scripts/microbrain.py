@@ -40,8 +40,8 @@ def main(argv):
     microbrain_mask = False
     explicit_mask = ''
 
-    fval = 0.3
-    gval = 0.0
+    bet_fval = 0.3
+    bet_gval = 0.0
     rerun_mask = False
     stabilize = False
     dnlsam = False
@@ -110,7 +110,7 @@ def main(argv):
 
     try:
         # Note some of these options were left for testing purposes
-        opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=", "rerun-mask",
+        opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "bet-fval=", "bet-gval=" "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=", "rerun-mask",
                                    "dmppca", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize","use-tensor-wm"])
     except getopt.GetoptError:
         print(help_string)
@@ -135,6 +135,10 @@ def main(argv):
                 shell_suffix = shell_suffix + 'b' + str(shell)
         elif opt in ("--bet-mask"):
             bet_mask = True
+        elif opt in ("--bet-fval"):
+            bet_fval = float(arg)
+        elif opt in ("--bet-gval"):
+            bet_gval = float(arg)
         elif opt in ("--microbrain-mask"):
             microbrain_mask = True
         elif opt in ("--no-mask"):
@@ -250,7 +254,7 @@ def main(argv):
 
         fbrain = ffirstb0.replace(fsl_ext(), '_brain' + fsl_ext())
         fmask = ffirstb0.replace(fsl_ext(), '_brain_mask' + fsl_ext())
-        process = subprocess.run(['bet', ffirstb0, fbrain, '-m', '-f', '0.3'],
+        process = subprocess.run(['bet', ffirstb0, fbrain, '-m', '-f', str(bet_fval), '-g', str(bet_gval)],
                                  stdout=subprocess.PIPE, universal_newlines=True)
 
     elif microbrain_mask:
@@ -400,7 +404,7 @@ def main(argv):
         if fieldmap:
             ffirstb0_brain = ffirstb0.replace(fsl_ext(), '_brain' + fsl_ext())
             process = subprocess.run(['bet', ffirstb0, ffirstb0_brain, '-m', '-f', str(
-                fval)], stdout=subprocess.PIPE, universal_newlines=True)
+                bet_fval),'-g',str(bet_gval)], stdout=subprocess.PIPE, universal_newlines=True)
 
             if pe_direction == 'AP':
                 unwarp_direction = 'y-'
