@@ -137,7 +137,7 @@ def main(argv):
             bet_mask = True
         elif opt in ("--bet-fval"):
             bet_fval = float(arg)
-        elif opt in ("--bet-gval"):
+        elif opt_in ("--bet-gval"):
             bet_gval = float(arg)
         elif opt in ("--microbrain-mask"):
             microbrain_mask = True
