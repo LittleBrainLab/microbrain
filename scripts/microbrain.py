@@ -46,6 +46,7 @@ def main(argv):
     stabilize = False
     dnlsam = False
     dmppca = False
+    dmppca_radius = 2
     gibbs = False
     eddy = False
     topup = False
@@ -110,8 +111,8 @@ def main(argv):
 
     try:
         # Note some of these options were left for testing purposes
-        opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "bet-fval", "bet-gval" "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=", "rerun-mask",
-                                   "dmppca", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize","use-tensor-wm"])
+        opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "bet-fval=", "bet-gval=" "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=", "rerun-mask",
+                                   "dmppca", "dmppca-radius=", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize","use-tensor-wm"])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -149,6 +150,8 @@ def main(argv):
             stabilize = True
         elif opt in ("--dmppca"):
             dmppca = True
+        elif opt in ("--dmppca-radius"):
+            dmppca_radius = int(arg)
         elif opt in ("--dnlsam"):
             dnlsam = True
         elif opt in ("--gibbs"):
@@ -319,8 +322,9 @@ def main(argv):
 
     # Denosing using MPPCA
     if dmppca:
+        print(dmppca_radius)
         fout = mbrain_preproc.denoiseMPPCA(
-            fout, fbval, fbvec, preprocDir, patch_radius=2)
+            fout, fbval, fbvec, preprocDir, patch_radius=dmppca_radius)
         preproc_suffix = preproc_suffix + '_DMPPCA'
 
     if gibbs:
