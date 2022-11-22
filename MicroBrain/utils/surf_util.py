@@ -232,6 +232,19 @@ def split_surface_by_label(surfVTK,label=None,label_name="HemiLabels"):
             thisSurf.GetPointData().AddArray(newPointData)
             
         thisSurf.Squeeze()
+
+        # clean mesh 
+        cleanFilter = vtk.vtkCleanPolyData()
+        cleanFilter.SetInputData(thisSurf)
+        cleanFilter.Update()
+        thisSurf = cleanFilter.GetOutput()
+
+        # remove duplicate polys
+        removeFilter = vtk.vtkRemoveDuplicatePolys()
+        removeFilter.SetInputData(thisSurf)
+        removeFilter.Update()
+        thisSurf = removeFilter.GetOutput()
+
         surfList = surfList + [thisSurf]
             
     return surfList
