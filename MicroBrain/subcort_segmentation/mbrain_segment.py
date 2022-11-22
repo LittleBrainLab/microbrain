@@ -39,6 +39,7 @@ LEFT_HIPPOAMYG_IDX = 88
 LEFT_STRIATUM_IDX = 66
 RIGHT_HIPPOAMYG_IDX = 188
 RIGHT_STRIATUM_IDX = 166
+VENT_IDX=200
 
 
 # move these functions to mbrain_io.py
@@ -190,7 +191,6 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
                    LEFT_ACCUM_IDX,
                    LEFT_HIPPOAMYG_IDX,
                    LEFT_STRIATUM_IDX,
-                   LEFT_VENT_IDX,
                    RIGHT_THAL_IDX,
                    RIGHT_CAUDATE_IDX,
                    RIGHT_PUT_IDX,
@@ -200,7 +200,7 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
                    RIGHT_ACCUM_IDX,
                    RIGHT_HIPPOAMYG_IDX,
                    RIGHT_STRIATUM_IDX,
-                   RIGHT_VENT_IDX]
+                   VENT_IDX]
 
     subcort_label = ['LEFT_THALAMUS',
                      'LEFT_CAUDATE',
@@ -211,7 +211,6 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
                      'LEFT_ACCUMBENS',
                      'LEFT_HIPPOAMYG',
                      'LEFT_STRIATUM',
-                     'LEFT_VENTRICLE',
                      'RIGHT_THALAMUS',
                      'RIGHT_CAUDATE',
                      'RIGHT_PUTAMEN',
@@ -221,7 +220,7 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
                      'RIGHT_ACCUMBENS',
                      'RIGHT_HIPPOAMYG',
                      'RIGHT_STRIATUM',
-                     'RIGHT_VENTRICLE']
+                     'VENTRICLES']
 
     for sind, slabel in zip(subcort_ind, subcort_label):
         tmplabel = np.zeros(harvard_data.shape[0:3])
@@ -243,15 +242,18 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
             tmplabel[binary_erosion(harvard_data[:, :, :, sind] > 35)] = 1
         elif sind == RIGHT_HIPPO_IDX or sind == LEFT_HIPPO_IDX:
             tmplabel[binary_erosion(harvard_data[:, :, :, sind] > 35)] = 1
+        elif sind == VENT_IDX:
+            tmplabel[harvard_data[:, :, :, LEFT_VENT_IDX] > 25] = 1
+            tmplabel[harvard_data[:, :, :, RIGHT_VENT_IDX] > 25] = 1
         else:
             tmplabel[binary_erosion(harvard_data[:, :, :, sind] > 50)] = 1
 
-        # remove large MD voxels if argument provided
-        if sind != RIGHT_VENT_IDX and sind != LEFT_VENT_IDX:
+        # # remove large MD voxels in GM if argument provided
+        if sind != VENT_IDX:
             if md_file:
                 tmplabel[md_data > md_thresh] = 0
             if fa_file:
-                tmplabel[fa_data < fa_thresh] = 0
+                tmplabel[fa_data > fa_thresh] = 0
 
         finit_tmplabel = finitlabels_prefix + '_' + slabel + fsl_ext()
         nib.save(nib.Nifti1Image(tmplabel, harvard_img.affine), finit_tmplabel)
@@ -801,6 +803,38 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
             sutil.write_surf_vtk(deepGM_surf, fsubcortseg_vtk)
     else:
         print('Subcortical Segmentation already performed: Skipping')
+
+    dwi_img = nib.load(fdwi)
+    dwi_data = dwi_img.get_data()
+    harvard_img = nib.load(fharvard_native)
+    harvard_data = harvard_img.get_data()
+    fa_img = nib.load(ffa)
+
+    # Ventricle segmentation
+    # Probabilistic based force for subcortical structures
+    vent_prob_force = np.zeros(dwi_data.shape)
+    vent_pos_ind = [LEFT_WHITE_IDX, LEFT_PUT_IDX, LEFT_CAUDATE_IDX, LEFT_ACCUM_IDX, LEFT_GLOB_IDX, LEFT_THAL_IDX, 
+        RIGHT_WHITE_IDX, RIGHT_PUT_IDX, RIGHT_CAUDATE_IDX, RIGHT_ACCUM_IDX, RIGHT_GLOB_IDX, RIGHT_THAL_IDX]
+    
+    vent_neg_ind = [LEFT_VENT_IDX, RIGHT_VENT_IDX]
+    
+    for pos_ind in vent_pos_ind:
+        vent_prob_force = vent_prob_force + harvard_data[:, :, :, pos_ind]
+
+    for neg_ind in vent_neg_ind:
+        vent_prob_force = vent_prob_force - harvard_data[:, :, :, neg_ind]
+
+    fvent_prob_force = probForceDir + subID + '_vent_prob_force' + fsl_ext()
+    nib.save(nib.Nifti1Image(vent_prob_force, fa_img.affine), fvent_prob_force)
+
+    # Deform ventricles on mean DWI
+    fvent = initSegDir + subID + initial_seg_prefix + '_VENTRICLES.vtk'
+    fvent_refined = meshDir + subID + seg_prefix + '_VENTRICLES.vtk'
+    if not path.exists(fvent_refined):
+        system('mirtk deform-mesh ' + fvent + ' ' + fvent_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fvent_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(
+                step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
+        sutil.surf_to_volume_mask(fdwi, fvent_refined, 1,
+                                voxelDir + subID + seg_prefix + '_VENTRICLES' + fsl_ext())
 
     return meshDir, voxelDir
 
