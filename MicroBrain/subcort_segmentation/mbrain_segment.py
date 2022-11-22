@@ -190,6 +190,7 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
                    LEFT_ACCUM_IDX,
                    LEFT_HIPPOAMYG_IDX,
                    LEFT_STRIATUM_IDX,
+                   LEFT_VENT_IDX,
                    RIGHT_THAL_IDX,
                    RIGHT_CAUDATE_IDX,
                    RIGHT_PUT_IDX,
@@ -198,7 +199,8 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
                    RIGHT_AMYG_IDX,
                    RIGHT_ACCUM_IDX,
                    RIGHT_HIPPOAMYG_IDX,
-                   RIGHT_STRIATUM_IDX]
+                   RIGHT_STRIATUM_IDX,
+                   RIGHT_VENT_IDX]
 
     subcort_label = ['LEFT_THALAMUS',
                      'LEFT_CAUDATE',
@@ -209,6 +211,7 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
                      'LEFT_ACCUMBENS',
                      'LEFT_HIPPOAMYG',
                      'LEFT_STRIATUM',
+                     'LEFT_VENTRICLE',
                      'RIGHT_THALAMUS',
                      'RIGHT_CAUDATE',
                      'RIGHT_PUTAMEN',
@@ -217,7 +220,8 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
                      'RIGHT_AMYGDALA',
                      'RIGHT_ACCUMBENS',
                      'RIGHT_HIPPOAMYG',
-                     'RIGHT_STRIATUM']
+                     'RIGHT_STRIATUM',
+                     'RIGHT_VENTRICLE']
 
     for sind, slabel in zip(subcort_ind, subcort_label):
         tmplabel = np.zeros(harvard_data.shape[0:3])
@@ -243,11 +247,11 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
             tmplabel[binary_erosion(harvard_data[:, :, :, sind] > 50)] = 1
 
         # remove large MD voxels if argument provided
-        if md_file:
-            tmplabel[md_data > md_thresh] = 0
-
-        if fa_file:
-            tmplabel[fa_data > fa_thresh] = 0
+        if sind != RIGHT_VENT_IDX and sind != LEFT_VENT_IDX:
+            if md_file:
+                tmplabel[md_data > md_thresh] = 0
+            if fa_file:
+                tmplabel[fa_data < fa_thresh] = 0
 
         finit_tmplabel = finitlabels_prefix + '_' + slabel + fsl_ext()
         nib.save(nib.Nifti1Image(tmplabel, harvard_img.affine), finit_tmplabel)
