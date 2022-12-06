@@ -556,11 +556,6 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
     fwm_dist = surfDir + thisSub + suffix + '_wm_cortex_dist' + fsl_ext()
     nib.save(nib.Nifti1Image(wm_dist, new_affine), fwm_dist)
     
-    # cortex/CSF distance map (from mirtk)
-    #cortex_dist = -1 * wm_prob
-    #cortex_dist = cortex_dist - gm_prob
-    #cortex_dist = cortex_dist + csf_prob
-    
     #output CSF seg
     fcsf_mask = surfDir + thisSub + suffix + '_csf_mask' + fsl_ext()
     csf_mask = np.zeros(seg_data.shape)
