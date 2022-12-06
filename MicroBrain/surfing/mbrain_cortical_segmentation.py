@@ -794,10 +794,10 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     wm_surf = sutil.read_surf_vtk(wm_final_fname)
     lh_wm_fname = wm_final_fname.replace('.vtk','_lh.vtk')
     rh_wm_fname = wm_final_fname.replace('.vtk','_rh.vtk')    
-    if not os.path.exists(lh_wm_fname) or not os.path.exists(rh_wm_fname):
-        [lh_wm,rh_wm] = sutil.split_surface_by_label(wm_surf)
-        sutil.write_surf_vtk(lh_wm, lh_wm_fname)
-        sutil.write_surf_vtk(rh_wm, rh_wm_fname)
+    #if not os.path.exists(lh_wm_fname) or not os.path.exists(rh_wm_fname):
+    [lh_wm,rh_wm] = sutil.split_surface_by_label(wm_surf)
+    sutil.write_surf_vtk(lh_wm, lh_wm_fname)
+    sutil.write_surf_vtk(rh_wm, rh_wm_fname)
     lh_wm_gii = vtktogii(lh_wm_fname, 'ANATOMICAL', 'GRAY_WHITE' , 'CORTEX_LEFT')
     rh_wm_gii = vtktogii(rh_wm_fname, 'ANATOMICAL', 'GRAY_WHITE' , 'CORTEX_RIGHT')
 
