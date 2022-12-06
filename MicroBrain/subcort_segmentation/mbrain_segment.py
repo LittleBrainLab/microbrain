@@ -899,20 +899,3 @@ def segment(procDir, subID, preproc_suffix, shell_suffix, cpu_num=0):
 
     return meshDir, voxelDir
 
-# sublist_fa = np.zeros((len(subList),8))
-# sublist_fa_std = np.zeros((len(subList),8))
-# sublist_md = np.zeros((len(subList),8))
-# sublist_md_std = np.zeros((len(subList),8))
-# sub_ind = 0
-
-#    FA, FAstd, MD, MDstd = extract_FA_MD_from_subcortical_segmentations(subID, segDir, ffa, fmd)
-#    sublist_fa[sub_ind,:] = FA
-#    sublist_fa_std[sub_ind,:] = FAstd
-#    sublist_md[sub_ind,:] = MD
-#    sublist_md[sub_ind,:] = MDstd
-#    sub_ind = sub_ind + 1
-
-# np.savetxt('seg_fa_mean.txt',sublist_fa)
-# np.savetxt('seg_fa_std.txt',sublist_fa_std)
-# np.savetxt('seg_md_mean.txt',sublist_md)
-# np.savetxt('seg_md_std.txt',sublist_md_std)
