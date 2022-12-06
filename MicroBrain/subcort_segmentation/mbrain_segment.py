@@ -783,6 +783,35 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
             sutil.surf_to_volume_mask(fdwi, fhippo_rh_refined, 1,
                                 voxelDir + subID + seg_prefix + '_RIGHT_HIPPO' + fsl_ext())
 
+
+        # Ventricle segmentation
+        # Probabilistic based force for subcortical structures
+        vent_prob_force = np.zeros(dwi_data.shape)
+        vent_pos_ind = [LEFT_WHITE_IDX, LEFT_PUT_IDX, LEFT_CAUDATE_IDX, LEFT_ACCUM_IDX, LEFT_GLOB_IDX, LEFT_THAL_IDX, 
+            RIGHT_WHITE_IDX, RIGHT_PUT_IDX, RIGHT_CAUDATE_IDX, RIGHT_ACCUM_IDX, RIGHT_GLOB_IDX, RIGHT_THAL_IDX]
+        
+        vent_neg_ind = [LEFT_VENT_IDX, RIGHT_VENT_IDX]
+        
+        for pos_ind in vent_pos_ind:
+            vent_prob_force = vent_prob_force + harvard_data[:, :, :, pos_ind]
+
+        for neg_ind in vent_neg_ind:
+            vent_prob_force = vent_prob_force - harvard_data[:, :, :, neg_ind]
+
+        fvent_prob_force = probForceDir + subID + '_vent_prob_force' + fsl_ext()
+        nib.save(nib.Nifti1Image(vent_prob_force, fa_img.affine), fvent_prob_force)
+
+        # Deform ventricles on mean DWI
+        fvent = initSegDir + subID + initial_seg_prefix + '_VENTRICLES.vtk'
+        fvent_refined = meshDir + subID + seg_prefix + '_VENTRICLES.vtk'
+        if not path.exists(fvent_refined):
+            system('mirtk deform-mesh ' + fvent + ' ' + fvent_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fvent_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(
+                    step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
+            system('mirtk project-onto-surface ' + fvent_refined + ' ' + fvent_refined +
+                ' -constant ' + str(VENT_IDX) + ' -pointdata -name struct_label')
+            sutil.surf_to_volume_mask(fdwi, fvent_refined, 1,
+                                    voxelDir + subID + seg_prefix + '_VENTRICLES' + fsl_ext())
+
         # Append subcort surfs together into single vtk file
         fsubcortseg_vtk = meshDir + subID + seg_prefix + '_subcortGM.vtk'
         if not path.exists(fsubcortseg_vtk):
@@ -797,6 +826,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
             appender.AddInputData(sutil.read_surf_vtk(famyg_lh_refined))
             appender.AddInputData(sutil.read_surf_vtk(fhippo_rh_refined))
             appender.AddInputData(sutil.read_surf_vtk(fhippo_lh_refined))
+            appender.AddInputData(sutil.read_surf_vtk(fvent_refined))
             appender.Update()
 
             deepGM_surf = appender.GetOutput()
@@ -804,37 +834,7 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
     else:
         print('Subcortical Segmentation already performed: Skipping')
 
-    dwi_img = nib.load(fdwi)
-    dwi_data = dwi_img.get_data()
-    harvard_img = nib.load(fharvard_native)
-    harvard_data = harvard_img.get_data()
-    fa_img = nib.load(ffa)
-
-    # Ventricle segmentation
-    # Probabilistic based force for subcortical structures
-    vent_prob_force = np.zeros(dwi_data.shape)
-    vent_pos_ind = [LEFT_WHITE_IDX, LEFT_PUT_IDX, LEFT_CAUDATE_IDX, LEFT_ACCUM_IDX, LEFT_GLOB_IDX, LEFT_THAL_IDX, 
-        RIGHT_WHITE_IDX, RIGHT_PUT_IDX, RIGHT_CAUDATE_IDX, RIGHT_ACCUM_IDX, RIGHT_GLOB_IDX, RIGHT_THAL_IDX]
     
-    vent_neg_ind = [LEFT_VENT_IDX, RIGHT_VENT_IDX]
-    
-    for pos_ind in vent_pos_ind:
-        vent_prob_force = vent_prob_force + harvard_data[:, :, :, pos_ind]
-
-    for neg_ind in vent_neg_ind:
-        vent_prob_force = vent_prob_force - harvard_data[:, :, :, neg_ind]
-
-    fvent_prob_force = probForceDir + subID + '_vent_prob_force' + fsl_ext()
-    nib.save(nib.Nifti1Image(vent_prob_force, fa_img.affine), fvent_prob_force)
-
-    # Deform ventricles on mean DWI
-    fvent = initSegDir + subID + initial_seg_prefix + '_VENTRICLES.vtk'
-    fvent_refined = meshDir + subID + seg_prefix + '_VENTRICLES.vtk'
-    if not path.exists(fvent_refined):
-        system('mirtk deform-mesh ' + fvent + ' ' + fvent_refined + ' -image ' + fdwi + ' -edge-distance 1.0 -edge-distance-averaging ' + averages + ' -edge-distance-smoothing 1 -edge-distance-median 1 -distance-image ' + fvent_prob_force + ' -distance 0.5 -distance-smoothing 1 -distance-averaging ' + averages + ' -distance-measure normal -optimizer EulerMethod -step ' + str(step_size) + ' -steps ' + str(
-                step_num) + ' -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.01 -min-distance 0.01 -repulsion 4.0 -repulsion-distance 0.5 -repulsion-width 2.0 -curvature ' + str(curv_w) + ' -gauss-curvature ' + str(gcurv_w) + ' -edge-distance-type ClosestMaximum' + cpu_str + '-ascii -remesh 1 -min-edge-length ' + str(min_edgelength) + ' -max-edge-length ' + str(max_edgelength))
-        sutil.surf_to_volume_mask(fdwi, fvent_refined, 1,
-                                voxelDir + subID + seg_prefix + '_VENTRICLES' + fsl_ext())
 
     return meshDir, voxelDir
 
