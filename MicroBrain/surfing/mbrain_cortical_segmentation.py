@@ -742,6 +742,16 @@ def split_surface(wm_final_fname, lh_wm_fname, rh_wm_fname):
 
     return
 
+def generate_midthickness(finner_surf, fouter_surf, fmedial):
+    inner_surf = sutil.read_surf_vtk(finner_surf)
+    outer_surf = sutil.read_surf_vtk(fouter_surf)
+
+    # compute mid-surface
+    medial_surf = sutil.compute_mid_surface(inner_surf, outer_surf)
+    sutil.write_surf_vtk(medial_surf, fmedial)
+
+    return
+
 def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix, shell_suffix, freesurf_subdir, cpu_num=0, use_tensor_wm=False):
     print("Surfing: " + thisSub)
     subDir = outDir + '/' + thisSub + '/'
@@ -848,11 +858,15 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     rh_pial_gii = vtktogii(rh_pial_fname, 'ANATOMICAL', 'PIAL' , 'CORTEX_RIGHT')
 
     # Generate mid-thickness surface
-    #print("Getting mid thickness surface")
-    #midthick_vtk = pial_vtk.replace('pial','midthick')
-    #     if not os.path.exists(midthick_vtk):
-    #         os.system('mid-surface ' + wm_vtk + ' ' + pial_vtk + ' ' + midthick_vtk + ' -ascii')
-    #         midthick_gii = vtktogii(midthick_vtk, 'ANATOMICAL', 'MIDTHICKNESS',C)
+    print("Getting mid thickness surface")
+    lh_mid_fname = lh_pial_fname.replace('pial','midthick')
+    rh_mid_fname = rh_pial_fname.replace('pial','midthick')
+    if not os.path.exists(lh_mid_fname) or not os.path.exists(rh_mid_fname):
+        generate_midthickness(lh_wm_fname, lh_pial_fname, lh_mid_fname)
+        generate_midthickness(rh_wm_fname, rh_pial_fname, rh_mid_fname)
+
+        lh_mid_gii = vtktogii(lh_mid_fname, 'ANATOMICAL', 'MIDTHICKNESS' , 'CORTEX_LEFT')
+        rh_mid_gii = vtktogii(rh_mid_fname, 'ANATOMICAL', 'MIDTHICKNESS' , 'CORTEX_RIGHT')
     return
     
     

@@ -249,58 +249,18 @@ def split_surface_by_label(surfVTK,label=None,label_name="HemiLabels"):
             
     return surfList
 
-def get_medial_surf_from_wm_gm(wmSurf, pialSurf):
+def compute_mid_surface(wmSurf, pialSurf):
     medialSurf = vtk.vtkPolyData()
     medialSurf.DeepCopy(wmSurf)
-    pointList = range(0,wmSurf.GetNumberOfPoints())
 
     wmPnts = vtk_to_numpy(wmSurf.GetPoints().GetData())
     pialPnts = vtk_to_numpy(pialSurf.GetPoints().GetData())
-    medialPnts = np.zeros(wmPnts.shape)
+    medialPnts = (wmPnts + pialPnts)/2.0 + wmPnts
     
-    wmPntMap = vtk_to_numpy(wmSurf.GetPointData().GetArray("InitialPoints"))
-    pialPntMap = vtk_to_numpy(pialSurf.GetPointData().GetArray("InitialPoints")) 
-    print(np.min(wmPntMap), np.max(wmPntMap))
-    print(np.min(pialPntMap), np.max(pialPntMap))
-
-    for pointID in pointList:
-        if pointID%1000 == 0:
-            output_stream.write("Calculating Medial Surface: Vert " + str(pointID) + "    \r")
-            output_stream.flush()
-        
-        sys.stdout.flush()
-        thisGMpnt = np.mean(pialPnts[np.where(pialPntMap == pointID), :], axis=0)
-        
-        if thisGMpnt.shape == (3,):
-            thisGMpnt = thisGMpnt[None,:]
-        
-        if  np.isnan(thisGMpnt).any() or thisGMpnt.shape[0] == 0:
-            medialPnts[pointID,:] = wmPnts[pointID,:]
-        else:
-            allGMpnts = pialPnts[np.squeeze(np.where(pialPntMap == pointID)), :]
-            if allGMpnts.shape == (3,):
-                allGMpnts = allGMpnts[None,:]
-            allWMpnts = np.repeat(wmPnts[pointID,:][None,:],allGMpnts.shape[0],axis=0)
-            distance = np.sqrt(np.sum(np.square(allWMpnts - allGMpnts),axis=1))
-            
-            minPnt = allGMpnts[distance == np.min(distance),:]
-            if minPnt.shape[0] == 2:
-                minPnt = np.squeeze(minPnt[0,0:3])
-            medialPnts[pointID,:] = wmPnts[pointID,:] + (minPnt - wmPnts[pointID,:])*0.5
-            
-            #distance = np.sqrt(np.sum(np.square(thisWMpnt -thisGMpnt),axis=1))
-            #if np.mean(distance) < 7.0:
-            #    medialPnts[pointID,:] = wmPnts[pointID,:] + (np.mean(thisGMpnt,axis=0) - wmPnts[pointID,:])/2
-            #else:
-            #    medialPnts[pointID,:] = wmPnts[pointID,:]
-
-    output_stream.write('\n') 
     new_vtkArray = numpy_to_vtk(medialPnts)
     new_vtkPoints = vtk.vtkPoints()
     new_vtkPoints.SetData(new_vtkArray)
     medialSurf.SetPoints(new_vtkPoints)
-
-    medialSurf = smooth_mesh(medialSurf, n_iter=20, relax = 0.2)
 
     return medialSurf
  
