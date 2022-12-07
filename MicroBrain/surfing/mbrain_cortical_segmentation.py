@@ -252,7 +252,7 @@ def multi_channel_tissue_classifier(ffa, fdwi, fmask, fgm_native, fwm_native, fc
 
    return fseg_out, fgm_prob_out, fwm_prob_out, fcsf_prob_out
 
-def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, surfDir, cpu_num = 0):
+def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, surfDir, cpu_num = 0):
 
     # Register GM, WM, CSF probability map to native space
     regDir = subDir + 'registration/'
@@ -383,10 +383,11 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
                 ' -v')
     else:
         print("GM segmentation already completed")
+
     gm_label = nib.load(atropos_gm_label).get_data()
     cerebellar_gm = gm_label ==2
     
-    # Segment CSF into ventricles / exterior csf 
+    # Segment CSF into vewm_lh_fname, wm_rh_fname,ntricles / exterior csf 
     atropos_csf_base = surfDir + thisSub + suffix + 'CSF_'
     atropos_csf_label = atropos_csf_base + 'label' + fsl_ext()
 
@@ -463,12 +464,8 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
     cerebellar_wm, new_affine = reslice(cerebellar_wm, seg_img.affine, old_vsize, new_vsize, order=0)
     dwi_data_reslice, new_affine = reslice(dwi_img.get_data(), dwi_img.affine, old_vsize, new_vsize, order=3)
     
-    fdwi_resamp = surfDir + thisSub + suffix + 'DWI_resamp' + fsl_ext()
     nib.save(nib.Nifti1Image(dwi_data_reslice, new_affine), fdwi_resamp)
-    
-    fdwi_neg = surfDir + thisSub + suffix + 'DWI_neg' + fsl_ext()
     nib.save(nib.Nifti1Image(-1 * dwi_data_reslice, new_affine), fdwi_neg)
-
 
     # Segmentation is not perfect at the moment, remove any pieces of the pseudo wm mask on islands 
     label_im, nb_labels = ndimage.label(pseudo_white == 1)
@@ -520,16 +517,12 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
     inter_mask[size_img == max(sizes)] = 0
     inter_mask[size_img != max(sizes)] = 1
 
-    fwm_lh = surfDir + thisSub + suffix + '_initwm_lh' + fsl_ext()
     nib.save(nib.Nifti1Image(np.int8(lh_pseudo_white), new_affine), fwm_lh)
 
-    fwm_rh = surfDir + thisSub + suffix + '_initwm_rh' + fsl_ext()
     nib.save(nib.Nifti1Image(np.int8(rh_pseudo_white), new_affine), fwm_rh)
 
-    finter = surfDir + thisSub + suffix + '_inter_mask' + fsl_ext()
     nib.save(nib.Nifti1Image(np.int8(inter_mask), new_affine), finter)
     
-    finter_hippo =  surfDir + thisSub + suffix + '_inter_mask_hippo' + fsl_ext()
     inter_mask[binary_dilation(binary_dilation(external_mask == 1))] = 0
     nib.save(nib.Nifti1Image(np.int8(inter_mask), new_affine), finter_hippo)
 
@@ -553,7 +546,6 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
     wm_dist[binary_dilation(binary_dilation(brain_stem))] = 1
     wm_dist[external_mask == 1] = 1
 
-    fwm_dist = surfDir + thisSub + suffix + '_wm_cortex_dist' + fsl_ext()
     nib.save(nib.Nifti1Image(wm_dist, new_affine), fwm_dist)
     
     #output CSF seg
@@ -576,7 +568,6 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
     cortex_dist[cerebellar_wm] = 2
     cortex_dist[external_mask == 1] = 2
 
-    fcortex_dist = surfDir + thisSub + suffix + '_cortex_csf_dist' + fsl_ext()
     nib.save(nib.Nifti1Image(cortex_dist, new_affine), fcortex_dist)
     
     # Estimate boundary FA
@@ -594,7 +585,6 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
     fa_target = np.percentile(fa_data[edge_data == 1],20)
 
     # Output tensor based force map 
-    ftb_force = surfDir + thisSub + suffix + '_tensor-based-force' + fsl_ext()
     force_data = -fa_data + fa_target
     force_data[csf_prob > 0.5] = csf_prob[csf_prob > 0.5]
     force_data[wm_dist == -1] = -1.0 
@@ -602,7 +592,155 @@ def generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, 
     force_data[inter_mask == 0] = -1.0
     nib.save(nib.Nifti1Image(force_data, new_affine), ftb_force)
 
-    return fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fcsf_prob
+    return finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force
+
+def generate_initial_wm_surface(surfDir, freesurf_subdir, thisSub, suffix, wm_lh_fname, wm_rh_fname, wm_surf_fname, finter):
+    wm_lh_surf_fname = surfDir + thisSub + suffix + '_wm_lh.vtk'
+    os.system('mirtk extract-surface ' + wm_lh_fname + ' ' + wm_lh_surf_fname + ' -isovalue 0.5')
+    os.system('mirtk extract-connected-points ' + wm_lh_surf_fname + ' ' + wm_lh_surf_fname )
+    os.system('mirtk remesh-surface ' + wm_lh_surf_fname + ' ' + wm_lh_surf_fname + ' -min-edgelength 0.5 -max-edgelength 1.0')
+    
+    wm_lh_surf = sutil.read_surf_vtk(wm_lh_surf_fname)
+
+    holeFiller = vtk.vtkFillHolesFilter()
+    holeFiller.SetInputData(wm_lh_surf)
+    holeFiller.SetHoleSize(0)
+    holeFiller.Update()
+    wm_lh_surf = holeFiller.GetOutput()
+
+    connFilter = vtk.vtkConnectivityFilter()
+    connFilter.SetInputData(wm_lh_surf)
+    connFilter.SetExtractionModeToLargestRegion()
+    connFilter.Update()
+    wm_lh_surf = connFilter.GetOutput()
+
+    smoother = vtk.vtkSmoothPolyDataFilter()
+    smoother.SetInputData(wm_lh_surf)
+    smoother.SetNumberOfIterations(300)
+    smoother.SetRelaxationFactor(0.1)
+    smoother.Update()
+    wm_lh_surf = smoother.GetOutput()
+
+    sutil.write_surf_vtk(wm_lh_surf, wm_lh_surf_fname)
+    
+    wm_lh_fix_fname = freesurf_fix_topology(wm_lh_surf_fname, 'CORTEX_LEFT', freesurf_subdir) # Outputs wm_surf_fname_fix
+    wm_lh_surf = sutil.read_surf_vtk(wm_lh_fix_fname)
+
+    leftLabels =  np.ones((wm_lh_surf.GetNumberOfPoints(),))
+    vtk_pntList = numpy_to_vtk(leftLabels)
+    vtk_pntList.SetName("HemiLabels")
+    wm_lh_surf.GetPointData().AddArray(vtk_pntList)
+
+    wm_rh_surf_fname =surfDir + thisSub + suffix + '_wm_rh.vtk'
+    os.system('mirtk extract-surface ' + wm_rh_fname + ' ' + wm_rh_surf_fname + ' -isovalue 0.5')
+    os.system('mirtk extract-connected-points ' + wm_rh_surf_fname + ' ' + wm_rh_surf_fname )
+    os.system('mirtk remesh-surface ' + wm_rh_surf_fname + ' ' + wm_rh_surf_fname + ' -min-edgelength 0.5 -max-edgelength 1.0')
+    
+    wm_rh_surf = sutil.read_surf_vtk(wm_rh_surf_fname)
+
+    holeFiller = vtk.vtkFillHolesFilter()
+    holeFiller.SetInputData(wm_rh_surf)
+    holeFiller.SetHoleSize(0)
+    holeFiller.Update()
+    wm_rh_surf = holeFiller.GetOutput()
+
+    connFilter = vtk.vtkConnectivityFilter()
+    connFilter.SetInputData(wm_rh_surf)
+    connFilter.SetExtractionModeToLargestRegion()
+    connFilter.Update()
+    wm_rh_surf = connFilter.GetOutput()
+    
+    smoother = vtk.vtkSmoothPolyDataFilter()
+    smoother.SetInputData(wm_rh_surf)
+    smoother.SetNumberOfIterations(300)
+    smoother.SetRelaxationFactor(0.1)
+    smoother.Update()
+    wm_rh_surf = smoother.GetOutput()
+
+    sutil.write_surf_vtk(wm_rh_surf, wm_rh_surf_fname)
+    
+    wm_rh_fix_fname = freesurf_fix_topology(wm_rh_surf_fname, 'CORTEX_RIGHT', freesurf_subdir)
+    wm_rh_surf = sutil.read_surf_vtk(wm_rh_fix_fname) 
+
+    rightLabels =  np.ones((wm_rh_surf.GetNumberOfPoints(),))*2
+    vtk_pntList = numpy_to_vtk(rightLabels)
+    vtk_pntList.SetName("HemiLabels")
+    wm_rh_surf.GetPointData().AddArray(vtk_pntList)
+
+    #combine left and right surfaces
+    appender = vtk.vtkAppendPolyData()
+    appender.AddInputData(wm_lh_surf)
+    appender.AddInputData(wm_rh_surf)
+    appender.Update()
+    wm_surf = appender.GetOutput()
+    sutil.write_surf_vtk(wm_surf, wm_surf_fname)
+
+    # Initalize white matter surface with mask
+    wm_surf = sutil.read_surf_vtk(wm_surf_fname)
+    imaskDil_ImgVTK, imaskDil_HdrVTK, sformMat = sutil.read_image(finter)
+    wm_surf = sutil.interpolate_voldata_to_surface(wm_surf, imaskDil_ImgVTK, sformMat, pntDataName='Mask',categorical=True)
+    wm_surf = sutil.interpolate_voldata_to_surface(wm_surf, imaskDil_ImgVTK, sformMat, pntDataName='InitialStatus', categorical=True)
+    sutil.write_surf_vtk(wm_surf, wm_surf_fname) 
+    
+    # Note that because the way 1's and 0's are used here, erode will make the mask bigger
+    os.system('mirtk open-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a Mask -n 5 ')
+    os.system('mirtk dilate-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a Mask -n 5 ')
+    os.system('mirtk erode-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a Mask -n 6 ')
+
+    os.system('mirtk open-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a InitialStatus -n 5 ')
+    os.system('mirtk dilate-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a InitialStatus -n 5 ')
+    os.system('mirtk erode-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a InitialStatus -n 6 ')
+
+    return
+
+def deform_initial_wm_surface_with_tissue_probabilities(wm_surf_fname, wm_surf_dist_fname, fwm_dist, finter_hippo, cpu_str):
+    os.system('mirtk deform-mesh ' + wm_surf_fname + ' ' + wm_surf_dist_fname + ' -distance-image ' + fwm_dist +' -distance 1.0 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
+
+    ##Add hippocampus/amygdala region to mask (no deformation of hippo/amygdala region from here on)
+    wm_surf = sutil.read_surf_vtk(wm_surf_dist_fname)
+    imaskDil_ImgVTK, _, sformMat = sutil.read_image(finter_hippo)
+    wm_surf = sutil.interpolate_voldata_to_surface(wm_surf, imaskDil_ImgVTK, sformMat, pntDataName='Mask',categorical=True)
+    wm_surf = sutil.interpolate_voldata_to_surface(wm_surf, imaskDil_ImgVTK, sformMat, pntDataName='InitialStatus', categorical=True)
+    sutil.write_surf_vtk(wm_surf, wm_surf_dist_fname)
+
+    # Note that because the way 1's and 0's are used here, erode will make the mask bigger
+    os.system('mirtk open-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a Mask -n 5 ')
+    os.system('mirtk dilate-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a Mask -n 5 ')
+    os.system('mirtk erode-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a Mask -n 6 ')
+
+    os.system('mirtk open-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a InitialStatus -n 5 ')
+    os.system('mirtk dilate-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a InitialStatus -n 5 ')
+    os.system('mirtk erode-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a InitialStatus -n 6 ')
+    
+    return
+
+def deform_wm_surface_with_tbforce(wm_surf_dist_fname, wm_tensor_fname, fdwi_resamp, ftb_force, cpu_str):
+    os.system('mirtk deform-mesh ' + wm_surf_dist_fname + ' ' + wm_tensor_fname + ' -image ' + fdwi_resamp + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -distance-image ' + ftb_force + ' -distance 1.0 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
+    
+    return
+
+def deform_wm_surface_with_meanDWI(wm_tensor_fname, wm_final_fname, fdwi_resamp, cpu_str):
+    os.system('mirtk deform-mesh ' + wm_tensor_fname + ' ' + wm_final_fname + ' -image ' + fdwi_resamp + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
+    
+    return
+
+def deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fname, fcortex_dist, cpu_str):
+    os.system('mirtk deform-mesh ' + wm_final_fname + ' ' + wm_expand_fname + ' -distance-image ' + fcortex_dist + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate'  + cpu_str)
+    
+    return
+
+def deform_cortex_surface_with_meanDWI(wm_expand_fname, pial_fname, fdwi_neg, cpu_str):
+    os.system('mirtk deform-mesh ' + wm_expand_fname + ' ' + pial_fname + ' -image ' + fdwi_neg + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -distance-image ' + fcortex_dist + ' -distance 0.35 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate' + cpu_str)
+
+    return
+
+def split_surface(wm_final_fname, lh_wm_fname, rh_wm_fname):
+    wm_surf = sutil.read_surf_vtk(wm_final_fname)
+    [lh_wm,rh_wm] = sutil.split_surface_by_label(wm_surf)
+    sutil.write_surf_vtk(lh_wm, lh_wm_fname)
+    sutil.write_surf_vtk(rh_wm, rh_wm_fname)
+
+    return
 
 def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix, shell_suffix, freesurf_subdir, cpu_num=0, use_tensor_wm=False):
     print("Surfing: " + thisSub)
@@ -615,6 +753,14 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     if not os.path.exists(tissueDir):
         os.system('mkdir ' + tissueDir)
 
+    initialDir = surfDir + 'initialization_surfaces/'
+    if not os.path.exists(initialDir):
+        os.system('mkdir ' + initialDir)
+
+    surfSegDir = surfDir + 'mesh_segmentation/'
+    if not os.path.exists(surfSegDir):
+        os.system('mkdir ' + surfSegDir)
+
     if preproc_suffix != '':
         suffix = '_' + preproc_suffix + '_' + shell_suffix 
     else:
@@ -625,146 +771,47 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     else:
         cpu_str = ' '
 
-    wm_surf_fname = surfDir + thisSub + suffix + '_wm.vtk'
+    wm_lh_fname = initialDir + thisSub + suffix + '_wm_lh' + fsl_ext()
+    wm_rh_fname = initialDir + thisSub + suffix + '_wm_rh' + fsl_ext()
+    finter = initialDir + thisSub + suffix + '_inter_mask' + fsl_ext()
+    finter_hippo = initialDir + thisSub + suffix + '_inter_mask_hippo' + fsl_ext()
+    fwm_dist = initialDir + thisSub + suffix + '_wm_cortex_dist' + fsl_ext()
+    fcortex_dist = initialDir + thisSub + suffix + '_cortex_csf_dist' + fsl_ext()
+    ftb_force = initialDir + thisSub + suffix + '_tensor-based-force' + fsl_ext()
+    fdwi_resamp = initialDir + thisSub + suffix + 'DWI_resamp' + fsl_ext()
+    fdwi_neg = initialDir + thisSub + suffix + 'DWI_neg' + fsl_ext()
     
-    wm_lh_fname, wm_rh_fname, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fcsf_prob = generate_initial_lr_wm(fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, surfDir, cpu_num=cpu_num)
+    if not os.path.exists(wm_lh_fname) or not os.path.exists(wm_rh_fname):
+        generate_initial_lr_wm(wm_lh_fname, wm_rh_fname, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, initialDir, cpu_num=cpu_num)
 
+    wm_surf_fname = surfSegDir + thisSub + suffix + '_wm.vtk'
     if not os.path.exists(wm_surf_fname):
-
-        wm_lh_surf_fname = surfDir + thisSub + suffix + '_wm_lh.vtk'
-        os.system('mirtk extract-surface ' + wm_lh_fname + ' ' + wm_lh_surf_fname + ' -isovalue 0.5')
-        os.system('mirtk extract-connected-points ' + wm_lh_surf_fname + ' ' + wm_lh_surf_fname )
-        os.system('mirtk remesh-surface ' + wm_lh_surf_fname + ' ' + wm_lh_surf_fname + ' -min-edgelength 0.5 -max-edgelength 1.0')
-        
-        wm_lh_surf = sutil.read_surf_vtk(wm_lh_surf_fname)
-
-        holeFiller = vtk.vtkFillHolesFilter()
-        holeFiller.SetInputData(wm_lh_surf)
-        holeFiller.SetHoleSize(0)
-        holeFiller.Update()
-        wm_lh_surf = holeFiller.GetOutput()
-
-        connFilter = vtk.vtkConnectivityFilter()
-        connFilter.SetInputData(wm_lh_surf)
-        connFilter.SetExtractionModeToLargestRegion()
-        connFilter.Update()
-        wm_lh_surf = connFilter.GetOutput()
-  
-        smoother = vtk.vtkSmoothPolyDataFilter()
-        smoother.SetInputData(wm_lh_surf)
-        smoother.SetNumberOfIterations(300)
-        smoother.SetRelaxationFactor(0.1)
-        smoother.Update()
-        wm_lh_surf = smoother.GetOutput()
-
-        sutil.write_surf_vtk(wm_lh_surf, wm_lh_surf_fname)
-        
-        wm_lh_fix_fname = freesurf_fix_topology(wm_lh_surf_fname, 'CORTEX_LEFT', freesurf_subdir) # Outputs wm_surf_fname_fix
-        wm_lh_surf = sutil.read_surf_vtk(wm_lh_fix_fname)
-
-        leftLabels =  np.ones((wm_lh_surf.GetNumberOfPoints(),))
-        vtk_pntList = numpy_to_vtk(leftLabels)
-        vtk_pntList.SetName("HemiLabels")
-        wm_lh_surf.GetPointData().AddArray(vtk_pntList)
-
-        wm_rh_surf_fname =surfDir + thisSub + suffix + '_wm_rh.vtk'
-        os.system('mirtk extract-surface ' + wm_rh_fname + ' ' + wm_rh_surf_fname + ' -isovalue 0.5')
-        os.system('mirtk extract-connected-points ' + wm_rh_surf_fname + ' ' + wm_rh_surf_fname )
-        os.system('mirtk remesh-surface ' + wm_rh_surf_fname + ' ' + wm_rh_surf_fname + ' -min-edgelength 0.5 -max-edgelength 1.0')
-        
-        wm_rh_surf = sutil.read_surf_vtk(wm_rh_surf_fname)
-
-        holeFiller = vtk.vtkFillHolesFilter()
-        holeFiller.SetInputData(wm_rh_surf)
-        holeFiller.SetHoleSize(0)
-        holeFiller.Update()
-        wm_rh_surf = holeFiller.GetOutput()
-
-        connFilter = vtk.vtkConnectivityFilter()
-        connFilter.SetInputData(wm_rh_surf)
-        connFilter.SetExtractionModeToLargestRegion()
-        connFilter.Update()
-        wm_rh_surf = connFilter.GetOutput()
-        
-        smoother = vtk.vtkSmoothPolyDataFilter()
-        smoother.SetInputData(wm_rh_surf)
-        smoother.SetNumberOfIterations(300)
-        smoother.SetRelaxationFactor(0.1)
-        smoother.Update()
-        wm_rh_surf = smoother.GetOutput()
-
-        sutil.write_surf_vtk(wm_rh_surf, wm_rh_surf_fname)
-        
-        wm_rh_fix_fname = freesurf_fix_topology(wm_rh_surf_fname, 'CORTEX_RIGHT', freesurf_subdir)
-        wm_rh_surf = sutil.read_surf_vtk(wm_rh_fix_fname) 
-
-        rightLabels =  np.ones((wm_rh_surf.GetNumberOfPoints(),))*2
-        vtk_pntList = numpy_to_vtk(rightLabels)
-        vtk_pntList.SetName("HemiLabels")
-        wm_rh_surf.GetPointData().AddArray(vtk_pntList)
-
-        #combine left and right surfaces
-        appender = vtk.vtkAppendPolyData()
-        appender.AddInputData(wm_lh_surf)
-        appender.AddInputData(wm_rh_surf)
-        appender.Update()
-        wm_surf = appender.GetOutput()
-        sutil.write_surf_vtk(wm_surf, wm_surf_fname)
-
-        # Initalize white matter surface with mask
-        wm_surf = sutil.read_surf_vtk(wm_surf_fname)
-        imaskDil_ImgVTK, imaskDil_HdrVTK, sformMat = sutil.read_image(finter)
-        wm_surf = sutil.interpolate_voldata_to_surface(wm_surf, imaskDil_ImgVTK, sformMat, pntDataName='Mask',categorical=True)
-        wm_surf = sutil.interpolate_voldata_to_surface(wm_surf, imaskDil_ImgVTK, sformMat, pntDataName='InitialStatus', categorical=True)
-        sutil.write_surf_vtk(wm_surf, wm_surf_fname) 
-       
-        # Note that because the way 1's and 0's are used here, erode will make the mask bigger
-        os.system('mirtk open-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a Mask -n 5 ')
-        os.system('mirtk dilate-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a Mask -n 5 ')
-        os.system('mirtk erode-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a Mask -n 6 ')
-
-        os.system('mirtk open-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a InitialStatus -n 5 ')
-        os.system('mirtk dilate-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a InitialStatus -n 5 ')
-        os.system('mirtk erode-scalars ' + wm_surf_fname + ' ' + wm_surf_fname + ' -a InitialStatus -n 6 ')
+        generate_initial_wm_surface(surfDir, freesurf_subdir, thisSub, suffix, wm_lh_fname, wm_rh_fname, wm_surf_fname, finter)
 
     # Refine WM Surface
     print("Initial WM Surface Deformation with Tissue Probabilities")
     wm_surf_dist_fname = wm_surf_fname.replace('.vtk','_TissueProbForce.vtk')
     if not os.path.exists(wm_surf_dist_fname):
-        os.system('mirtk deform-mesh ' + wm_surf_fname + ' ' + wm_surf_dist_fname + ' -distance-image ' + fwm_dist +' -distance 1.0 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
-    
-        ##Add hippocampus/amygdala region to mask (no deformation of hippo/amygdala region from here on)
-        wm_surf = sutil.read_surf_vtk(wm_surf_dist_fname)
-        imaskDil_ImgVTK, _, sformMat = sutil.read_image(finter_hippo)
-        wm_surf = sutil.interpolate_voldata_to_surface(wm_surf, imaskDil_ImgVTK, sformMat, pntDataName='Mask',categorical=True)
-        wm_surf = sutil.interpolate_voldata_to_surface(wm_surf, imaskDil_ImgVTK, sformMat, pntDataName='InitialStatus', categorical=True)
-        sutil.write_surf_vtk(wm_surf, wm_surf_dist_fname)
-
-        # Note that because the way 1's and 0's are used here, erode will make the mask bigger
-        os.system('mirtk open-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a Mask -n 5 ')
-        os.system('mirtk dilate-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a Mask -n 5 ')
-        os.system('mirtk erode-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a Mask -n 6 ')
-
-        os.system('mirtk open-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a InitialStatus -n 5 ')
-        os.system('mirtk dilate-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a InitialStatus -n 5 ')
-        os.system('mirtk erode-scalars ' + wm_surf_dist_fname + ' ' + wm_surf_dist_fname + ' -a InitialStatus -n 6 ')
+        deform_initial_wm_surface_with_tissue_probabilities(wm_surf_fname, wm_surf_dist_fname, fwm_dist, cpu_str)
     else:
         print("white surface already refined on tissue probability map")
 
+    # Refine WM Surface with Tensor-Based Force
     print("WM Surface with mean DWI with tensor-based force")
     wm_tensor_fname = wm_surf_fname.replace('.vtk', '_tensorBasedForce.vtk')
     if not os.path.exists(wm_tensor_fname):
-        os.system('mirtk deform-mesh ' + wm_surf_dist_fname + ' ' + wm_tensor_fname + ' -image ' + fdwi_resamp + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -distance-image ' + ftb_force + ' -distance 1.0 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
+        deform_wm_surface_with_tbforce(wm_surf_dist_fname, wm_tensor_fname, fdwi_resamp, ftb_force, cpu_str)
     else:
         print("white surface already generated with Tensor-Based Force")
     
+    # Refine WM Surface on mean DWI
     if use_tensor_wm:
         wm_final_fname = wm_tensor_fname
     else:
         print("Refining WM Surface with mean DWI only")
         wm_final_fname = wm_surf_fname.replace('.vtk', '_final.vtk')
         if not os.path.exists(wm_final_fname):
-            os.system('mirtk deform-mesh ' + wm_tensor_fname + ' ' + wm_final_fname + ' -image ' + fdwi_resamp + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
+            deform_wm_surface_with_meanDWI(wm_tensor_fname, wm_final_fname, fdwi_resamp, cpu_str)
         else:
             print("white surface already refined on DWI")
 
@@ -772,42 +819,43 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     print("Expanding white surface Using GM/CSF Boundary Distance Map")
     wm_expand_fname = surfDir + thisSub + suffix + '_pial_init.vtk'
     if not os.path.exists(wm_expand_fname):
-        os.system('mirtk deform-mesh ' + wm_final_fname + ' ' + wm_expand_fname + ' -distance-image ' + fcortex_dist + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate'  + cpu_str)
+        deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fname, fcortex_dist, cpu_str)
     else:
         print("Expanded surface already generated")
 
-    ## Generate pial surface Flip weighting so that the mean DWI edges are more heavily weighted.
+    ## Generate pial surface on mean DWI edges are more heavily weighted.
     print("Refining CSF/GREY border on mean DWI")
     pial_fname =  surfDir + thisSub + suffix + '_pial.vtk'
     if not os.path.exists(pial_fname):
-        os.system('mirtk deform-mesh ' + wm_expand_fname + ' ' + pial_fname + ' -image ' + fdwi_neg + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -distance-image ' + fcortex_dist + ' -distance 0.35 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate' + cpu_str)
+        deform_cortex_surface_with_meanDWI(wm_expand_fname, pial_fname, fdwi_neg, cpu_str)
     else:
         print("pial remesh already made")
 
-    # TODO speed up split surface (right now the function uses a single for loop!!!)
     # Split WM surface
-    wm_surf = sutil.read_surf_vtk(wm_final_fname)
     lh_wm_fname = wm_final_fname.replace('.vtk','_lh.vtk')
     rh_wm_fname = wm_final_fname.replace('.vtk','_rh.vtk')    
-    #if not os.path.exists(lh_wm_fname) or not os.path.exists(rh_wm_fname):
-    [lh_wm,rh_wm] = sutil.split_surface_by_label(wm_surf)
-    sutil.write_surf_vtk(lh_wm, lh_wm_fname)
-    sutil.write_surf_vtk(rh_wm, rh_wm_fname)
+    if not os.path.exists(lh_wm_fname) or not os.path.exists(rh_wm_fname):
+        split_surface(wm_final_fname, lh_wm_fname, rh_wm_fname)
     lh_wm_gii = vtktogii(lh_wm_fname, 'ANATOMICAL', 'GRAY_WHITE' , 'CORTEX_LEFT')
     rh_wm_gii = vtktogii(rh_wm_fname, 'ANATOMICAL', 'GRAY_WHITE' , 'CORTEX_RIGHT')
+    
+    # Split Pial surface
+    lh_pial_fname = pial_fname.replace('.vtk','_lh.vtk')
+    rh_pial_fname = pial_fname.replace('.vtk','_rh.vtk')
+    if not os.path.exists(lh_pial_fname) or not os.path.exists(rh_pial_fname):
+         split_surface(pial_fname, lh_pial_fname, rh_pial_fname)
+    lh_pial_gii = vtktogii(lh_pial_fname, 'ANATOMICAL', 'PIAL' , 'CORTEX_LEFT')
+    rh_pial_gii = vtktogii(rh_pial_fname, 'ANATOMICAL', 'PIAL' , 'CORTEX_RIGHT')
 
+    # Generate mid-thickness surface
+    #print("Getting mid thickness surface")
+    #midthick_vtk = pial_vtk.replace('pial','midthick')
+    #     if not os.path.exists(midthick_vtk):
+    #         os.system('mid-surface ' + wm_vtk + ' ' + pial_vtk + ' ' + midthick_vtk + ' -ascii')
+    #         midthick_gii = vtktogii(midthick_vtk, 'ANATOMICAL', 'MIDTHICKNESS',C)
     return
     
-    # # Split Pial surface
-    # pial_surf = sutil.read_surf_vtk(pial_fname)
-    # lh_pial_fname = pial_fname.replace('.vtk','_lh.vtk')
-    # rh_pial_fname = pial_fname.replace('.vtk','_rh.vtk')
-    # if not os.path.exists(lh_pial_fname) or not os.path.exists(rh_pial_fname):
-    #     [lh_pial,rh_pial] = sutil.split_surface_by_label(pial_surf)
-    #     sutil.write_surf_vtk(lh_pial, lh_pial_fname)
-    #     sutil.write_surf_vtk(rh_pial, rh_pial_fname)
-    # lh_pial_gii = vtktogii(lh_pial_fname, 'ANATOMICAL', 'PIAL' , 'CORTEX_LEFT')
-    # rh_pial_gii = vtktogii(rh_pial_fname, 'ANATOMICAL', 'PIAL' , 'CORTEX_RIGHT')
+    
     
     # for hemi in ['lh','rh']:
     #     if hemi == 'lh':
@@ -839,13 +887,6 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     #         os.system('mirtk calculate ' + curv_vtk + ' -mul -1 -scalars Curvature -out ' + curv_vtk)
     #         giimap(curv_vtk, curv_gii, 'Curvature', 'Curvature', C)
     #         os.system('wb_command -metric-dilate ' + curv_gii + ' ' + wm_gii + ' 10 ' + curv_gii + ' -nearest')
-  
-    #     # Get MidThickness Surface
-    #     print("Getting mid thickness surface")
-    #     midthick_vtk = pial_vtk.replace('pial','midthick')
-    #     if not os.path.exists(midthick_vtk):
-    #         os.system('mid-surface ' + wm_vtk + ' ' + pial_vtk + ' ' + midthick_vtk + ' -ascii')
-    #         midthick_gii = vtktogii(midthick_vtk, 'ANATOMICAL', 'MIDTHICKNESS',C)
        
     
 
