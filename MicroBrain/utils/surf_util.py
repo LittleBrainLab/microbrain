@@ -91,7 +91,7 @@ def write_image(image,header,sformMat,fname):
     elif header.GetPixDim(0) == 1:
         writer.SetQFac(1)
     else:
-        writer.SetQFac(1)
+        writer.SetQFac(-1)
     
     writer.Write()
 
@@ -255,7 +255,7 @@ def compute_mid_surface(wmSurf, pialSurf):
 
     wmPnts = vtk_to_numpy(wmSurf.GetPoints().GetData())
     pialPnts = vtk_to_numpy(pialSurf.GetPoints().GetData())
-    medialPnts = (wmPnts + pialPnts)/2.0 + wmPnts
+    medialPnts = (pialPnts - wmPnts)/2.0 + wmPnts
     
     new_vtkArray = numpy_to_vtk(medialPnts)
     new_vtkPoints = vtk.vtkPoints()

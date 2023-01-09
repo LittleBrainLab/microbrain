@@ -548,27 +548,40 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
 
     nib.save(nib.Nifti1Image(wm_dist, new_affine), fwm_dist)
     
-    #output CSF seg
-    fcsf_mask = surfDir + thisSub + suffix + '_csf_mask' + fsl_ext()
-    csf_mask = np.zeros(seg_data.shape)
-    csf_mask[seg_data == 1] = 1
-    csf_mask[seg_data == 2] = 1
-    nib.save(nib.Nifti1Image(csf_mask, new_affine), fcsf_mask)
-    
-    #convert to distant image (mirtk)
-    fcortex_dist_mirtk = surfDir + thisSub + suffix + '_cortex_csf_dist_mirtk' + fsl_ext()
-    os.system('mirtk calculate-distance-map ' + fcsf_mask + ' ' + fcortex_dist_mirtk) 
-
-    # Load distance image and fill internal and external structures
-    cortex_dist = nib.load(fcortex_dist_mirtk).get_data()
-    cortex_dist[binary_dilation(binary_dilation(internal_mask == 1))] = -2
-    cortex_dist[binary_dilation(binary_dilation(ventricles))] = -2
+    # cortex/CSF distance map (from tissue probs)
+    cortex_dist = -1 * wm_prob
+    cortex_dist = cortex_dist - gm_prob
+    cortex_dist = cortex_dist + csf_prob
+    cortex_dist[internal_mask == 1] = -1
+    cortex_dist[ventricles] = -1
     cortex_dist[binary_dilation(binary_dilation(brain_stem))] = 2
     cortex_dist[cerebellar_gm] = 2
     cortex_dist[cerebellar_wm] = 2
     cortex_dist[external_mask == 1] = 2
-
+    
     nib.save(nib.Nifti1Image(cortex_dist, new_affine), fcortex_dist)
+    
+    # #output CSF seg
+    # fcsf_mask = surfDir + thisSub + suffix + '_csf_mask' + fsl_ext()
+    # csf_mask = np.zeros(seg_data.shape)
+    # csf_mask[seg_data == 1] = 1
+    # csf_mask[seg_data == 2] = 1
+    # nib.save(nib.Nifti1Image(csf_mask, new_affine), fcsf_mask)
+    
+    # #convert to distant image (mirtk)
+    # fcortex_dist_mirtk = surfDir + thisSub + suffix + '_cortex_csf_dist_mirtk' + fsl_ext()
+    # os.system('mirtk calculate-distance-map ' + fcsf_mask + ' ' + fcortex_dist_mirtk) 
+
+    # # Load distance image and fill internal and external structures
+    # cortex_dist = nib.load(fcortex_dist_mirtk).get_data()
+    # cortex_dist[binary_dilation(binary_dilation(internal_mask == 1))] = -2
+    # cortex_dist[binary_dilation(binary_dilation(ventricles))] = -2
+    # cortex_dist[binary_dilation(binary_dilation(brain_stem))] = 2
+    # cortex_dist[cerebellar_gm] = 2
+    # cortex_dist[cerebellar_wm] = 2
+    # cortex_dist[external_mask == 1] = 2
+
+    # nib.save(nib.Nifti1Image(cortex_dist, new_affine), fcortex_dist)
     
     # Estimate boundary FA
     fwm_edge = fpseudo_white.replace(fsl_ext(),'_edge' + fsl_ext())
@@ -726,7 +739,7 @@ def deform_wm_surface_with_meanDWI(wm_tensor_fname, wm_final_fname, fdwi_resamp,
 
 def deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fname, fcortex_dist, cpu_str):
     os.system('mirtk deform-mesh ' + wm_final_fname + ' ' + wm_expand_fname + ' -distance-image ' + fcortex_dist + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate'  + cpu_str)
-    
+     
     return
 
 def deform_cortex_surface_with_meanDWI(wm_expand_fname, pial_fname, fdwi_neg, cpu_str):
@@ -763,9 +776,13 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     if not os.path.exists(tissueDir):
         os.system('mkdir ' + tissueDir)
 
-    initialDir = surfDir + 'initialization_surfaces/'
-    if not os.path.exists(initialDir):
-        os.system('mkdir ' + initialDir)
+    initialMaskDir = surfDir + 'initial_masks/'
+    if not os.path.exists(initialMaskDir):
+        os.system('mkdir ' + initialMaskDir)
+
+    initialSurfDir = surfDir + 'initial_surfaces/'
+    if not os.path.exists(initialSurfDir):
+        os.system('mkdir ' + initialSurfDir)
 
     surfSegDir = surfDir + 'mesh_segmentation/'
     if not os.path.exists(surfSegDir):
@@ -781,28 +798,28 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     else:
         cpu_str = ' '
 
-    wm_lh_fname = initialDir + thisSub + suffix + '_wm_lh' + fsl_ext()
-    wm_rh_fname = initialDir + thisSub + suffix + '_wm_rh' + fsl_ext()
-    finter = initialDir + thisSub + suffix + '_inter_mask' + fsl_ext()
-    finter_hippo = initialDir + thisSub + suffix + '_inter_mask_hippo' + fsl_ext()
-    fwm_dist = initialDir + thisSub + suffix + '_wm_cortex_dist' + fsl_ext()
-    fcortex_dist = initialDir + thisSub + suffix + '_cortex_csf_dist' + fsl_ext()
-    ftb_force = initialDir + thisSub + suffix + '_tensor-based-force' + fsl_ext()
-    fdwi_resamp = initialDir + thisSub + suffix + 'DWI_resamp' + fsl_ext()
-    fdwi_neg = initialDir + thisSub + suffix + 'DWI_neg' + fsl_ext()
+    wm_lh_fname = initialMaskDir + thisSub + suffix + '_wm_lh' + fsl_ext()
+    wm_rh_fname = initialMaskDir + thisSub + suffix + '_wm_rh' + fsl_ext()
+    finter = initialMaskDir + thisSub + suffix + '_inter_mask' + fsl_ext()
+    finter_hippo = initialMaskDir + thisSub + suffix + '_inter_mask_hippo' + fsl_ext()
+    fwm_dist = initialMaskDir + thisSub + suffix + '_wm_cortex_dist' + fsl_ext()
+    fcortex_dist = initialMaskDir + thisSub + suffix + '_cortex_csf_dist' + fsl_ext()
+    ftb_force = initialMaskDir + thisSub + suffix + '_tensor-based-force' + fsl_ext()
+    fdwi_resamp = initialMaskDir + thisSub + suffix + 'DWI_resamp' + fsl_ext()
+    fdwi_neg = initialMaskDir + thisSub + suffix + 'DWI_neg' + fsl_ext()
     
     if not os.path.exists(wm_lh_fname) or not os.path.exists(wm_rh_fname):
-        generate_initial_lr_wm(wm_lh_fname, wm_rh_fname, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, initialDir, cpu_num=cpu_num)
+        generate_initial_lr_wm(wm_lh_fname, wm_rh_fname, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, initialMaskDir, cpu_num=cpu_num)
 
     wm_surf_fname = surfSegDir + thisSub + suffix + '_wm.vtk'
     if not os.path.exists(wm_surf_fname):
-        generate_initial_wm_surface(surfDir, freesurf_subdir, thisSub, suffix, wm_lh_fname, wm_rh_fname, wm_surf_fname, finter)
+        generate_initial_wm_surface(initialSurfDir, freesurf_subdir, thisSub, suffix, wm_lh_fname, wm_rh_fname, wm_surf_fname, finter)
 
     # Refine WM Surface
     print("Initial WM Surface Deformation with Tissue Probabilities")
     wm_surf_dist_fname = wm_surf_fname.replace('.vtk','_TissueProbForce.vtk')
     if not os.path.exists(wm_surf_dist_fname):
-        deform_initial_wm_surface_with_tissue_probabilities(wm_surf_fname, wm_surf_dist_fname, fwm_dist, cpu_str)
+        deform_initial_wm_surface_with_tissue_probabilities(wm_surf_fname, wm_surf_dist_fname, fwm_dist, finter_hippo, cpu_str)
     else:
         print("white surface already refined on tissue probability map")
 
@@ -825,19 +842,31 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
         else:
             print("white surface already refined on DWI")
 
+    wm_final_mask_fname = wm_final_fname.replace('.vtk', '_mask' + fsl_ext())
+    if not os.path.exists(wm_final_mask_fname):
+        sutil.surf_to_volume_mask(finter, wm_final_fname, 1, wm_final_mask_fname)
+
+    # read in mask
+    mask = nib.load(wm_final_mask_fname).get_data()
+    cortex_dist_img = nib.load(fcortex_dist)
+    cortex_dist = cortex_dist_img.get_data()
+    cortex_dist[mask==1] = -1
+    cortex_dist_img = nib.Nifti1Image(cortex_dist, cortex_dist_img.affine, cortex_dist_img.header)
+    nib.save(cortex_dist_img, fcortex_dist)
+
     ## Move surface outward edge based on DWI and Tissue Classification Probability maps
     print("Expanding white surface Using GM/CSF Boundary Distance Map")
-    wm_expand_fname = surfDir + thisSub + suffix + '_pial_init.vtk'
+    wm_expand_fname = surfSegDir + thisSub + suffix + '_pial_init.vtk'
     if not os.path.exists(wm_expand_fname):
-        deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fname, fcortex_dist, cpu_str)
+        deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fname, fcortex_dist, fdwi_neg, cpu_str)
     else:
         print("Expanded surface already generated")
 
     ## Generate pial surface on mean DWI edges are more heavily weighted.
     print("Refining CSF/GREY border on mean DWI")
-    pial_fname =  surfDir + thisSub + suffix + '_pial.vtk'
+    pial_fname =  surfSegDir + thisSub + suffix + '_pial.vtk'
     if not os.path.exists(pial_fname):
-        deform_cortex_surface_with_meanDWI(wm_expand_fname, pial_fname, fdwi_neg, cpu_str)
+        deform_cortex_surface_with_meanDWI(wm_expand_fname, pial_fname, fcortex_dist, fdwi_neg, cpu_str)
     else:
         print("pial remesh already made")
 
@@ -865,8 +894,9 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
         generate_midthickness(lh_wm_fname, lh_pial_fname, lh_mid_fname)
         generate_midthickness(rh_wm_fname, rh_pial_fname, rh_mid_fname)
 
-        lh_mid_gii = vtktogii(lh_mid_fname, 'ANATOMICAL', 'MIDTHICKNESS' , 'CORTEX_LEFT')
-        rh_mid_gii = vtktogii(rh_mid_fname, 'ANATOMICAL', 'MIDTHICKNESS' , 'CORTEX_RIGHT')
+    lh_mid_gii = vtktogii(lh_mid_fname, 'ANATOMICAL', 'MIDTHICKNESS' , 'CORTEX_LEFT')
+    rh_mid_gii = vtktogii(rh_mid_fname, 'ANATOMICAL', 'MIDTHICKNESS' , 'CORTEX_RIGHT')
+    
     return
     
     
