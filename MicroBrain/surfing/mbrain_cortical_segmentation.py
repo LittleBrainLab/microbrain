@@ -742,7 +742,7 @@ def deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fn
      
     return
 
-def deform_cortex_surface_with_meanDWI(wm_expand_fname, pial_fname, fdwi_neg, cpu_str):
+def deform_cortex_surface_with_meanDWI(wm_expand_fname, pial_fname, fcortex_dist, fdwi_neg, cpu_str):
     os.system('mirtk deform-mesh ' + wm_expand_fname + ' ' + pial_fname + ' -image ' + fdwi_neg + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -distance-image ' + fcortex_dist + ' -distance 0.35 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate' + cpu_str)
 
     return
@@ -858,7 +858,7 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     print("Expanding white surface Using GM/CSF Boundary Distance Map")
     wm_expand_fname = surfSegDir + thisSub + suffix + '_pial_init.vtk'
     if not os.path.exists(wm_expand_fname):
-        deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fname, fcortex_dist, fdwi_neg, cpu_str)
+        deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fname, fcortex_dist, cpu_str)
     else:
         print("Expanded surface already generated")
 
