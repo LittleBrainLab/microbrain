@@ -34,7 +34,7 @@ def fsl_ext():
     return fsl_extension
 
 
-def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=10, sfthres_init=0.1, sfthres=0.15, min_length_tractogram=0, min_length=4, max_length=20, min_mesh_length=0.10, max_mesh_length=0.15):
+def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=10, sfthres_init=0.1, sfthres=0.15, min_length_tractogram=0, min_length=2, max_length=20, min_mesh_length=0.10, max_mesh_length=0.15):
 
     mask_dir = outDir + '/tracking_mask'
     if not os.path.exists(mask_dir):
