@@ -40,12 +40,12 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
     fdwi = segDir + '/voxel_output/' + subID + '_refined_LEFT_STRIATUM' + fsl_ext()  
     
     # LH WM to mask
-    flh_wmsurf = surfDir + '/' + subID + '_b0b1000_wm_final_lh.vtk'
+    flh_wmsurf = surfDir + '/mesh_segmentation/' + subID + '_b0b1000_wm_final_lh.vtk'
     flh_out = flh_wmsurf.replace('.vtk', '_mask.nii.gz')
     sutil.surf_to_volume_mask(fdwi, flh_wmsurf, 1, flh_out)
 
     # RH WM to mask
-    frh_wmsurf = surfDir + '/' + subID + '_b0b1000_wm_final_rh.vtk'
+    frh_wmsurf = surfDir + '/mesh_segmentation/' + subID + '_b0b1000_wm_final_rh.vtk'
     frh_out = frh_wmsurf.replace('.vtk', '_mask.nii.gz')
     sutil.surf_to_volume_mask(fdwi, frh_wmsurf, 1, frh_out)
 
