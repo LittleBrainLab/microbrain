@@ -34,7 +34,7 @@ def fsl_ext():
     return fsl_extension
 
 
-def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=10, sfthres_init=0.1, sfthres=0.15, min_length_tractogram=0, min_length=4, max_length=20, min_mesh_length=0.10, max_mesh_length=0.15):
+def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=10, sfthres_init=0.1, sfthres=0.15, min_length_tractogram=0, min_length=2, max_length=20, min_mesh_length=0.10, max_mesh_length=0.15):
 
     mask_dir = outDir + '/tracking_mask'
     if not os.path.exists(mask_dir):
@@ -101,9 +101,38 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
     if not os.path.exists(metric_dir):
         os.makedirs(metric_dir)
 
+    ic_roi_dir = tracking_dir + '/ic_roi'
+    if not os.path.exists(ic_roi_dir):
+        os.makedirs(ic_roi_dir)
+
     # for each hemisphere left and right create a tractogram for the striatum and globus pallidus
     # Generating globus tractogram here just for QA purposes (is not included in gm cell bridge reconstruction)
     for hemi in ['LEFT', 'RIGHT']:
+        # register JHU atlas to subject space
+        atlas='/usr/local/fsl/data/atlases/JHU/JHU-ICBM-labels-1mm.nii.gz'
+        regDir=subDir + '/registration/'
+        affine=regDir + '/ants_native2mni_0GenericAffine.mat'
+        warp=regDir + '/ants_native2mni_1InverseWarp.nii.gz'
+        regAtlas=ic_roi_dir + '/JHU-ICBM-labels-1mm_reg2native.nii.gz'
+
+        if not os.path.exists(regAtlas):
+            os.system('antsApplyTransforms -d 3 -i ' + atlas + ' -r ' + fmask_brain + ' -o ' + regAtlas + ' -n NearestNeighbor -t [' + affine + ',1] -t ' + warp)
+
+        ic_roi=ic_roi_dir + '/' + subID + '_' + hemi + '_ic_roi.nii.gz'
+        if not os.path.exists(ic_roi):
+            if hemi == 'LEFT':
+                os.system('fslmaths ' + regAtlas + ' -thr 18 -uthr 18 -bin ' + ic_roi.replace('.nii.gz','_anterior.nii.gz'))
+                os.system('fslmaths ' + regAtlas + ' -thr 20 -uthr 20 -bin ' + ic_roi.replace('.nii.gz','_posterior.nii.gz'))
+            else:
+                os.system('fslmaths ' + regAtlas + ' -thr 17 -uthr 17 -bin ' + ic_roi.replace('.nii.gz','_anterior.nii.gz'))
+                os.system('fslmaths ' + regAtlas + ' -thr 19 -uthr 19 -bin ' + ic_roi.replace('.nii.gz','_posterior.nii.gz'))
+            os.system('fslmaths ' + ic_roi.replace('.nii.gz','_anterior.nii.gz') + ' -add ' + ic_roi.replace('.nii.gz','_posterior.nii.gz') + ' ' + ic_roi)
+
+        # dilate IC ROI
+        ic_roi_dilated=ic_roi.replace('.nii.gz','_dilated.nii.gz')
+        if not os.path.exists(ic_roi_dilated):
+            os.system('fslmaths ' + ic_roi + ' -kernel sphere 2 -dilM ' + ic_roi_dilated)
+
         for struct in ['STRIATUM', 'GLOBUS']:
             StructVTK=subDir + '/subcortical_segmentation/mesh_output/' + subID + '_refined_' + hemi + '_' + struct + '.vtk' 
             
@@ -120,15 +149,18 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
             inNorms_remesh = seed_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_remesh_norms.txt'
             StructPLY_remesh_reorient=mesh_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_remesh_reorient.ply'
             if not os.path.exists(inCoords_remesh):
-                os.system('scil_convert_mesh_to_coords_norms.py ' + StructPLY_remesh + ' ' + inCoords_remesh + ' ' + inNorms_remesh + ' --apply_transform ' + fmask_brain + ' --ras --output_mesh ' + StructPLY_remesh_reorient)
+                os.system('scil_convert_mesh_to_coords_norms.py ' + StructPLY_remesh + ' ' + inCoords_remesh + ' ' + inNorms_remesh + ' --apply_transform ' + fmask_brain + ' --ras --output_mesh ' + StructPLY_remesh_reorient + ' --within_mask ' + ic_roi_dilated)
 
             # Generate tractogram for structure
             out_tractogram_remesh = tractogram_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_tractogram.trk'
-            if not os.path.exists(out_tractogram_remesh):
+            if not os.path.exists(out_tractogram_remesh) and struct != 'GLOBUS':
                 os.system('scil_compute_mesh_based_local_tracking.py ' + ffodf + ' ' + inCoords_remesh + ' ' +
                         fmask_tracking + ' ' + out_tractogram_remesh + ' --in_norm_list ' + inNorms_remesh +
-                        ' --save_seeds --min_length ' + str(min_length_tractogram) + ' --sfthres_init ' + str(sfthres_init) + ' --sfthres ' + str(sfthres) + ' --algo ' + str(algo) + ' --nbr_sps ' + str(nbr_seeds) + ' -v ')
-    
+                        ' --save_seeds --min_length ' + str(min_length_tractogram) + ' --sfthres_init ' + str(sfthres_init) + ' --sfthres ' + str(sfthres) + ' --algo ' + str(algo) + ' --nbr_sps ' + str(nbr_seeds) + ' -v')
+                #os.system('scil_compute_mesh_based_local_tracking.py ' + ffodf + ' ' + inCoords_remesh + ' ' +
+                #        fmask_tracking + ' ' + out_tractogram_remesh  +
+                #       ' --save_seeds --min_length ' + str(min_length_tractogram) + ' --sfthres_init ' + str(sfthres_init) + ' --sfthres ' + str(sfthres) + ' --algo ' + str(algo) + ' --nbr_sps ' + str(nbr_seeds) + ' -v ')
+                 
     # Filter tractograms to create a single cellular bridge tractogram per hemisphere
     streamline_file_list = []
     for hemi in ['LEFT', 'RIGHT']:
@@ -227,7 +259,7 @@ def main(argv):
     if outDir == '':
         outDir = baseDir + '/' + subID + '/tracking'
 
-    print('Running whole brain tractography using scilpy tools: ' + subID)
+    print('Running caudalentricular GM tractography using scilpy tools: ' + subID)
 
     # Create output directory if it doesn't exist
     if not os.path.exists(outDir):
