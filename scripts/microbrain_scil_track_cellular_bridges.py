@@ -119,14 +119,22 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
             os.system('antsApplyTransforms -d 3 -i ' + atlas + ' -r ' + fmask_brain + ' -o ' + regAtlas + ' -n NearestNeighbor -t [' + affine + ',1] -t ' + warp)
 
         ic_roi=ic_roi_dir + '/' + subID + '_' + hemi + '_ic_roi.nii.gz'
+        ic_roi_seeding_mask=ic_roi.replace('.nii.gz', '_seeding_mask.nii.gz')
         if not os.path.exists(ic_roi):
             if hemi == 'LEFT':
                 os.system('fslmaths ' + regAtlas + ' -thr 18 -uthr 18 -bin ' + ic_roi.replace('.nii.gz','_anterior.nii.gz'))
                 os.system('fslmaths ' + regAtlas + ' -thr 20 -uthr 20 -bin ' + ic_roi.replace('.nii.gz','_posterior.nii.gz'))
+                os.system('fslmaths ' + regAtlas + ' -thr 44 -uthr 44 -bin ' + ic_roi.replace('.nii.gz','_slf.nii.gz'))
+                os.system('fslmaths ' + regAtlas + ' -thr 26 -uthr 26 -bin ' + ic_roi.replace('.nii.gz','_scorrad.nii.gz'))
             else:
                 os.system('fslmaths ' + regAtlas + ' -thr 17 -uthr 17 -bin ' + ic_roi.replace('.nii.gz','_anterior.nii.gz'))
                 os.system('fslmaths ' + regAtlas + ' -thr 19 -uthr 19 -bin ' + ic_roi.replace('.nii.gz','_posterior.nii.gz'))
-            os.system('fslmaths ' + ic_roi.replace('.nii.gz','_anterior.nii.gz') + ' -add ' + ic_roi.replace('.nii.gz','_posterior.nii.gz') + ' ' + ic_roi)
+                os.system('fslmaths ' + regAtlas + ' -thr 43 -uthr 43 -bin ' + ic_roi.replace('.nii.gz','_slf.nii.gz'))
+                os.system('fslmaths ' + regAtlas + ' -thr 25 -uthr 25 -bin ' + ic_roi.replace('.nii.gz','_scorrad.nii.gz'))
+
+            os.system('fslmaths ' + ic_roi.replace('.nii.gz','_anterior.nii.gz') + ' -add ' + ic_roi.replace('.nii.gz','_posterior.nii.gz') + 
+                    ' -add ' + ic_roi.replace('.nii.gz','_slf.nii.gz') + ' -add ' + ic_roi.replace('.nii.gz','_scorrad.nii.gz') + ' ' + ic_roi)
+            os.system('fslmaths ' + ic_roi.replace('.nii.gz','_anterior.nii.gz') + ' -add ' + ic_roi.replace('.nii.gz','_posterior.nii.gz') + ' ' + ic_roi_seeding_mask)
 
         # dilate IC ROI
         ic_roi_dilated=ic_roi.replace('.nii.gz','_dilated.nii.gz')
@@ -169,7 +177,6 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
 
         # Meshes
         in_mesh_STRIATUM = mesh_dir + '/' + subID + '_refined_' + hemi + '_STRIATUM_remesh.ply'
-        in_mesh_GLOBUS = mesh_dir + '/' + subID + '_refined_' + hemi + '_GLOBUS_remesh.ply'
 
         # STRIATUM Both Ends
         out_tractogram_STRIATUM_STRIATUM = tractogram_gm_cellular_bridge_dir + '/' + subID + '_refined_' + hemi + '_STRIATUM_tractogram_filter_STRIATUM_Both_Ends.trk'
@@ -177,39 +184,15 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
             os.system('scil_filter_tractogram_based_on_mesh.py ' + in_tractogram_STRIATUM + ' ' + out_tractogram_STRIATUM_STRIATUM + ' --mesh_roi ' + in_mesh_STRIATUM + ' both_ends include --dist_thr 0.1')
         
         # STRIATUM orientation
-        out_tractogram_STRIATUM_STRIATUM_orientation = out_tractogram_STRIATUM_STRIATUM.replace('.trk', '_orientationMaxY3.trk')
+        out_tractogram_STRIATUM_STRIATUM_orientation = out_tractogram_STRIATUM_STRIATUM.replace('.trk', '_orientationMaxY6.trk')
         if not os.path.exists(out_tractogram_STRIATUM_STRIATUM_orientation):
-            os.system('scil_filter_streamlines_by_orientation.py ' + out_tractogram_STRIATUM_STRIATUM + ' ' + out_tractogram_STRIATUM_STRIATUM_orientation + ' --max_y 3 ')
+            os.system('scil_filter_streamlines_by_orientation.py ' + out_tractogram_STRIATUM_STRIATUM + ' ' + out_tractogram_STRIATUM_STRIATUM_orientation + ' --max_y 6 ')
 
         # STRIATUM length
-        out_tractogram_STRIATUM_STRIATUM_orientation_length = out_tractogram_STRIATUM_STRIATUM_orientation.replace('.trk', '_filterlen.trk')
+        out_tractogram_STRIATUM_STRIATUM_orientation_length = tractogram_gm_cellular_bridge_dir + '/' + subID + '_refined_' + hemi + '_gm_celluar_bridge_tractogram.trk'
         if not os.path.exists(out_tractogram_STRIATUM_STRIATUM_orientation_length):
             os.system('scil_filter_streamlines_by_length.py ' + out_tractogram_STRIATUM_STRIATUM_orientation + ' ' + out_tractogram_STRIATUM_STRIATUM_orientation_length + ' --maxL ' + str(max_length) + ' --minL ' + str(min_length))
         streamline_file_list.append(out_tractogram_STRIATUM_STRIATUM_orientation_length)
-
-        # STRIATUM end in GLOBUS
-        out_tractogram_STRIATUM_GLOBUS = tractogram_gm_cellular_bridge_dir + '/' + subID + '_refined_' + hemi + '_STRIATUM_tractogram_filter_GLOBUS_End.trk'
-        if not os.path.exists(out_tractogram_STRIATUM_GLOBUS):
-            os.system('scil_filter_tractogram_based_on_mesh.py ' + in_tractogram_STRIATUM + ' ' + out_tractogram_STRIATUM_GLOBUS + ' --mesh_roi ' + in_mesh_GLOBUS + ' only_end include --dist_thr 0.1')
-        
-        # STRIATUM orientation
-        out_tractogram_STRIATUM_GLOBUS_orientation = out_tractogram_STRIATUM_GLOBUS.replace('.trk', '_orientationMaxY3.trk')
-        if not os.path.exists(out_tractogram_STRIATUM_GLOBUS_orientation):
-            os.system('scil_filter_streamlines_by_orientation.py ' + out_tractogram_STRIATUM_GLOBUS + ' ' + out_tractogram_STRIATUM_GLOBUS_orientation + ' --max_y 3 ')
-        
-        # STRIATUM length
-        out_tractogram_STRIATUM_GLOBUS_orientation_length = out_tractogram_STRIATUM_GLOBUS_orientation.replace('.trk', '_filterlen.trk')
-        if not os.path.exists(out_tractogram_STRIATUM_GLOBUS_orientation_length):
-            os.system('scil_filter_streamlines_by_length.py ' + out_tractogram_STRIATUM_GLOBUS_orientation + ' ' + out_tractogram_STRIATUM_GLOBUS_orientation_length + ' --maxL ' + str(max_length) + ' --minL ' + str(min_length))
-        streamline_file_list.append(out_tractogram_STRIATUM_GLOBUS_orientation_length)
-
-        # concatentate tractograms
-        out_tractogram_cellular_bridge = tractogram_gm_cellular_bridge_dir + '/' + subID + '_refined_' + hemi + '_gm_celluar_bridge_tractogram.trk'
-        if not os.path.exists(out_tractogram_cellular_bridge):
-            os.system('scil_streamlines_math.py concatenate ' + out_tractogram_STRIATUM_STRIATUM_orientation_length +
-                      ' ' + out_tractogram_STRIATUM_GLOBUS_orientation_length +
-                      ' ' + out_tractogram_cellular_bridge)    
-        streamline_file_list.append(out_tractogram_cellular_bridge)
 
     # Output quantative metrics for each tractogram
     for streamline_file in streamline_file_list:
