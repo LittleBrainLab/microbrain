@@ -175,29 +175,39 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
         out_tractogram_STRIATUM_STRIATUM = tractogram_gm_cellular_bridge_dir + '/' + subID + '_refined_' + hemi + '_STRIATUM_tractogram_filter_STRIATUM_Both_Ends.trk'
         if not os.path.exists(out_tractogram_STRIATUM_STRIATUM):
             os.system('scil_filter_tractogram_based_on_mesh.py ' + in_tractogram_STRIATUM + ' ' + out_tractogram_STRIATUM_STRIATUM + ' --mesh_roi ' + in_mesh_STRIATUM + ' both_ends include --dist_thr 0.1')
+        
+        # STRIATUM orientation
+        out_tractogram_STRIATUM_STRIATUM_orientation = out_tractogram_STRIATUM_STRIATUM.replace('.trk', '_orientationMaxY3.trk')
+        if not os.path.exists(out_tractogram_STRIATUM_STRIATUM_orientation):
+            os.system('scil_filter_streamlines_by_orientation.py ' + out_tractogram_STRIATUM_STRIATUM + ' ' + out_tractogram_STRIATUM_STRIATUM_orientation + ' --max_y 3 ')
 
         # STRIATUM length
-        out_tractogram_STRIATUM_STRIATUM_length = out_tractogram_STRIATUM_STRIATUM.replace('.trk', '_filterlen.trk')
-        if not os.path.exists(out_tractogram_STRIATUM_STRIATUM_length):
-            os.system('scil_filter_streamlines_by_length.py ' + out_tractogram_STRIATUM_STRIATUM + ' ' + out_tractogram_STRIATUM_STRIATUM_length + ' --maxL ' + str(max_length) + ' --minL ' + str(min_length))
-        streamline_file_list.append(out_tractogram_STRIATUM_STRIATUM_length)
+        out_tractogram_STRIATUM_STRIATUM_orientation_length = out_tractogram_STRIATUM_STRIATUM_orientation.replace('.trk', '_filterlen.trk')
+        if not os.path.exists(out_tractogram_STRIATUM_STRIATUM_orientation_length):
+            os.system('scil_filter_streamlines_by_length.py ' + out_tractogram_STRIATUM_STRIATUM_orientation + ' ' + out_tractogram_STRIATUM_STRIATUM_orientation_length + ' --maxL ' + str(max_length) + ' --minL ' + str(min_length))
+        streamline_file_list.append(out_tractogram_STRIATUM_STRIATUM_orientation_length)
 
         # STRIATUM end in GLOBUS
         out_tractogram_STRIATUM_GLOBUS = tractogram_gm_cellular_bridge_dir + '/' + subID + '_refined_' + hemi + '_STRIATUM_tractogram_filter_GLOBUS_End.trk'
         if not os.path.exists(out_tractogram_STRIATUM_GLOBUS):
             os.system('scil_filter_tractogram_based_on_mesh.py ' + in_tractogram_STRIATUM + ' ' + out_tractogram_STRIATUM_GLOBUS + ' --mesh_roi ' + in_mesh_GLOBUS + ' only_end include --dist_thr 0.1')
         
+        # STRIATUM orientation
+        out_tractogram_STRIATUM_GLOBUS_orientation = out_tractogram_STRIATUM_GLOBUS.replace('.trk', '_orientationMaxY3.trk')
+        if not os.path.exists(out_tractogram_STRIATUM_GLOBUS_orientation):
+            os.system('scil_filter_streamlines_by_orientation.py ' + out_tractogram_STRIATUM_GLOBUS + ' ' + out_tractogram_STRIATUM_GLOBUS_orientation + ' --max_y 3 ')
+        
         # STRIATUM length
-        out_tractogram_STRIATUM_GLOBUS_length = out_tractogram_STRIATUM_GLOBUS.replace('.trk', '_filterlen.trk')
-        if not os.path.exists(out_tractogram_STRIATUM_GLOBUS_length):
-            os.system('scil_filter_streamlines_by_length.py ' + out_tractogram_STRIATUM_GLOBUS + ' ' + out_tractogram_STRIATUM_GLOBUS_length + ' --maxL ' + str(max_length) + ' --minL ' + str(min_length))
-        streamline_file_list.append(out_tractogram_STRIATUM_GLOBUS_length)
+        out_tractogram_STRIATUM_GLOBUS_orientation_length = out_tractogram_STRIATUM_GLOBUS_orientation.replace('.trk', '_filterlen.trk')
+        if not os.path.exists(out_tractogram_STRIATUM_GLOBUS_orientation_length):
+            os.system('scil_filter_streamlines_by_length.py ' + out_tractogram_STRIATUM_GLOBUS_orientation + ' ' + out_tractogram_STRIATUM_GLOBUS_orientation_length + ' --maxL ' + str(max_length) + ' --minL ' + str(min_length))
+        streamline_file_list.append(out_tractogram_STRIATUM_GLOBUS_orientation_length)
 
         # concatentate tractograms
         out_tractogram_cellular_bridge = tractogram_gm_cellular_bridge_dir + '/' + subID + '_refined_' + hemi + '_gm_celluar_bridge_tractogram.trk'
         if not os.path.exists(out_tractogram_cellular_bridge):
-            os.system('scil_streamlines_math.py concatenate ' + out_tractogram_STRIATUM_STRIATUM_length +
-                      ' ' + out_tractogram_STRIATUM_GLOBUS_length +
+            os.system('scil_streamlines_math.py concatenate ' + out_tractogram_STRIATUM_STRIATUM_orientation_length +
+                      ' ' + out_tractogram_STRIATUM_GLOBUS_orientation_length +
                       ' ' + out_tractogram_cellular_bridge)    
         streamline_file_list.append(out_tractogram_cellular_bridge)
 
