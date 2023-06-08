@@ -155,9 +155,10 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
             # Output txt files containing mesh vertex coordinates and norms
             inCoords_remesh = seed_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_remesh_coords.txt'
             inNorms_remesh = seed_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_remesh_norms.txt'
+            seeds_trk = seed_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_seeds.trk'
             StructPLY_remesh_reorient=mesh_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_remesh_reorient.ply'
             if not os.path.exists(inCoords_remesh):
-                os.system('scil_convert_mesh_to_coords_norms.py ' + StructPLY_remesh + ' ' + inCoords_remesh + ' ' + inNorms_remesh + ' --apply_transform ' + fmask_brain + ' --ras --output_mesh ' + StructPLY_remesh_reorient + ' --within_mask ' + ic_roi_dilated)
+                os.system('scil_convert_mesh_to_coords_norms.py ' + StructPLY_remesh + ' ' + inCoords_remesh + ' ' + inNorms_remesh + ' --apply_transform ' + fmask_brain + ' --ras --output_mesh ' + StructPLY_remesh_reorient + ' --within_mask ' + ic_roi_dilated + ' --output_trk ' + seeds_trk)
 
             # Generate tractogram for structure
             out_tractogram_remesh = tractogram_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_tractogram.trk'
@@ -212,9 +213,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
     return
 
 def main(argv):
-    subList = []
-    outDir = ''
-
+    
     help_string = """usage: microbrain_export_wm_tracking_mask.py -s <subject_directory> -o <output_directory> 
     description: microbrain_scil_whole_brain_tractography.py outputs  
 
@@ -223,11 +222,15 @@ def main(argv):
 
     optional arguments:
     -o, --outDir <output_directory> - directory for output if doesn't exist will make it (default: <subject_directory>/tracking)) 
+    
+    optional tracking parameters:
+    --sfthres_init <float> - initial seed fODF threshold (default: 0.1)
+    --sfthres <float> - seed fODF threshold (default: 0.15)
     """
 
     try:
         # Note some of these options were left for testing purposes
-        opts, args = getopt.getopt(argv, "hs:o", ["subDir", "outDir"])
+        opts, args = getopt.getopt(argv, "hs:o", ["subDir", "outDir", '--sfthres=', '--sfthres_init='])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -236,7 +239,12 @@ def main(argv):
         print(help_string)
         sys.exit(2)
 
+    # Defaults
+    subList = []
     outDir = ''
+    sfthres_init = 0.1
+    sfthres = 0.15
+
     for opt, arg in opts:
         if opt == '-h':
             print(help_string)
@@ -245,6 +253,10 @@ def main(argv):
             subDir = os.path.normpath(arg)
         elif opt in ("-o", "--outDir"):
             outDir = os.path.normpath(arg)
+        elif opt == '--sfthres_init':
+            sfthres_init = float(arg)
+        elif opt == '--sfthres':
+            sfthres = float(arg)
 
     # Get FA, MD and subcortical GM segmentation directory
     baseDir, subID = os.path.split(os.path.normpath(subDir))
@@ -258,7 +270,7 @@ def main(argv):
     if not os.path.exists(outDir):
         os.makedirs(outDir)
 
-    run_cell_bridge_tractography(subDir, subID, outDir)
+    run_cell_bridge_tractography(subDir, subID, outDir, sfthres=sfthres, sfthres_init=sfthres_init)
     
 if __name__ == "__main__":
     main(sys.argv[1:])
