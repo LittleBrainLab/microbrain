@@ -248,9 +248,9 @@ def main(argv):
     elif bet_mask:
         # Extract b0s
         fout_img = nib.load(fout)
-        fout_data = fout_img.get_data()
+        fout_data = fout_img.get_fdata()
 
-        b0_data = fout_data[:, :, :, np.logical_or(bvals < 50, bvals > -50)]
+        b0_data = fout_data[:, :, :, np.logical_and(bvals < 50, bvals > -50)]
         firstb0_data = b0_data[:, :, :, 0]
         ffirstb0 = fout.replace(fsl_ext(), '_firstb0' + fsl_ext())
         nib.save(nib.Nifti1Image(firstb0_data, fout_img.affine), ffirstb0)

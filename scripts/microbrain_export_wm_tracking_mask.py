@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 import os
 import sys
+import glob
 sys.path.append('../../MicroBrain/')
 
 import getopt
@@ -40,12 +41,13 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
     fdwi = segDir + '/voxel_output/' + subID + '_refined_LEFT_STRIATUM' + fsl_ext()  
     
     # LH WM to mask
-    flh_wmsurf = surfDir + '/mesh_segmentation/' + subID + '_b0b1000_wm_final_lh.vtk'
+    flh_wmsurf = glob.glob(surfDir + '/mesh_segmentation/' + subID + '*_wm_final_lh.vtk')[0]
+    print(flh_wmsurf)
     flh_out = flh_wmsurf.replace('.vtk', '_mask.nii.gz')
     sutil.surf_to_volume_mask(fdwi, flh_wmsurf, 1, flh_out)
 
     # RH WM to mask
-    frh_wmsurf = surfDir + '/mesh_segmentation/' + subID + '_b0b1000_wm_final_rh.vtk'
+    frh_wmsurf = glob.glob(surfDir + '/mesh_segmentation/' + subID + '*_wm_final_rh.vtk')[0]
     frh_out = frh_wmsurf.replace('.vtk', '_mask.nii.gz')
     sutil.surf_to_volume_mask(fdwi, frh_wmsurf, 1, frh_out)
 
@@ -94,7 +96,7 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
         wm_data[seg_data == 1] =  0
 
     # Remove CSF (ventricles) from mask
-    fmd = dtiDir + '/' + subID + '_b0b1000_MD.nii.gz'
+    fmd = glob.glob(dtiDir + '/' + subID + '*_MD.nii.gz')[0]
     md_data = nib.load(fmd).get_data()
 
     wm_data[md_data > 0.0015] =  0

@@ -832,11 +832,11 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
         print("white surface already generated with Tensor-Based Force")
     
     # Refine WM Surface on mean DWI
+    wm_final_fname = wm_surf_fname.replace('.vtk', '_final.vtk')
     if use_tensor_wm:
-        wm_final_fname = wm_tensor_fname
+        os.system('cp ' + wm_tensor_fname + ' ' + wm_final_fname)
     else:
         print("Refining WM Surface with mean DWI only")
-        wm_final_fname = wm_surf_fname.replace('.vtk', '_final.vtk')
         if not os.path.exists(wm_final_fname):
             deform_wm_surface_with_meanDWI(wm_tensor_fname, wm_final_fname, fdwi_resamp, cpu_str)
         else:
