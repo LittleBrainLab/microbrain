@@ -230,7 +230,7 @@ def main(argv):
 
     try:
         # Note some of these options were left for testing purposes
-        opts, args = getopt.getopt(argv, "hs:o", ["subDir", "outDir", '--sfthres=', '--sfthres_init='])
+        opts, args = getopt.getopt(argv, "hs:o", ["subDir", "outDir", "sfthres=", "sfthres_init="])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -253,9 +253,9 @@ def main(argv):
             subDir = os.path.normpath(arg)
         elif opt in ("-o", "--outDir"):
             outDir = os.path.normpath(arg)
-        elif opt == '--sfthres_init':
+        elif opt in ('--sfthres_init'):
             sfthres_init = float(arg)
-        elif opt == '--sfthres':
+        elif opt in ('--sfthres'):
             sfthres = float(arg)
 
     # Get FA, MD and subcortical GM segmentation directory
