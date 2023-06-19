@@ -1,6 +1,8 @@
 #!/usr/local/bin/python
 import os
 import sys
+from glob import glob
+
 sys.path.append('../../MicroBrain/')
 
 import getopt
@@ -34,7 +36,7 @@ def fsl_ext():
     return fsl_extension
 
 
-def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=10, sfthres_init=0.1, sfthres=0.1, min_length_tractogram=0, min_length=2, max_length=20, min_mesh_length=0.10, max_mesh_length=0.15):
+def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=10, sfthres_init=0.1, sfthres=0.15, min_length_tractogram=0, min_length=2, max_length=20, min_mesh_length=0.10, max_mesh_length=0.15):
 
     mask_dir = outDir + '/tracking_mask'
     if not os.path.exists(mask_dir):
@@ -163,6 +165,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
             # Generate tractogram for structure
             out_tractogram_remesh = tractogram_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '_tractogram.trk'
             if not os.path.exists(out_tractogram_remesh) and struct != 'GLOBUS':
+                print('sfthres: ' + str(sfthres))
                 os.system('scil_compute_mesh_based_local_tracking.py ' + ffodf + ' ' + inCoords_remesh + ' ' +
                         fmask_tracking + ' ' + out_tractogram_remesh + ' --in_norm_list ' + inNorms_remesh +
                         ' --save_seeds --min_length ' + str(min_length_tractogram) + ' --sfthres_init ' + str(sfthres_init) + ' --sfthres ' + str(sfthres) + ' --algo ' + str(algo) + ' --nbr_sps ' + str(nbr_seeds) + ' -v')
@@ -205,10 +208,50 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
         out_streamline_density_norm = metric_dir + '/' + streamline_file_name.replace('.trk', '_density_norm.nii.gz')
         if not os.path.exists(out_streamline_density_norm):
             os.system('scil_image_math.py normalize_max ' + out_streamline_density + ' ' + out_streamline_density_norm + ' --data float32')
-            
+
+        out_streamline_density_mask = metric_dir + '/' + streamline_file_name.replace('.trk', '_density_mask.nii.gz')
+        if not os.path.exists(out_streamline_density_mask):
+            os.system('scil_image_math.py ceil ' + out_streamline_density_norm + ' ' + out_streamline_density_mask + ' --data uint8')
+
         out_afd_map = metric_dir + '/' + streamline_file_name.replace('.trk', '_afd.nii.gz')
         if not os.path.exists(out_afd_map):
             os.system('scil_compute_mean_fixel_afd_from_bundles.py ' + streamline_file + ' ' + ffodf + ' ' + out_afd_map)
+
+        out_bingham_map = metric_dir + '/' + streamline_file_name.replace('.trk', '_bingham.nii.gz')
+        if not os.path.exists(out_bingham_map):
+            os.system('scil_fit_bingham_to_fodf.py ' + ffodf + ' ' + out_bingham_map + ' --mask ' + out_streamline_density_mask)
+        
+        out_fd_map = metric_dir + '/' + streamline_file_name.replace('.trk', '_fd.nii.gz')
+        if not os.path.exists(out_fd_map):
+            os.system('scil_compute_lobe_specific_fodf_metrics.py ' + out_bingham_map + ' --out_fd ' + out_fd_map + ' --mask ' + out_streamline_density_mask + ' --not_all')
+
+        out_fd_fixel_map = metric_dir + '/' + streamline_file_name.replace('.trk', '_fd_fixel.nii.gz')
+        if not os.path.exists(out_fd_fixel_map):
+            os.system('scil_compute_mean_fixel_lobe_metric_from_bundles.py ' + streamline_file + ' ' + out_bingham_map + ' ' + out_fd_map + ' ' + out_fd_fixel_map)
+
+        out_metric_file = metric_dir + '/' + subID + '_metrics.csv'
+        out_weighted_metric_file = metric_dir + '/' + subID + '_weighted_metrics.csv'
+        if not os.path.exists(out_metric_file) or not os.path.exists(out_weighted_metric_file):
+            # extract mean FA, AFD_fixel and FA_fixel for each tractogram
+            fa_map = glob(subDir + '/DTI_maps/*FA.nii.gz')[0]
+            metric_list = [fa_map, out_afd_map, out_fd_fixel_map]
+            metric_name_list = ['FA', 'AFD', 'FD']
+            
+            # read in normalized density mask
+            density_norm = nib.load(out_streamline_density_norm).get_fdata()
+            
+            metric_array = np.zeros((len(metric_list), 1))
+            weighted_metric_array = np.zeros((len(metric_list), 1))
+            for metric, metric_name in zip(metric_list, metric_name_list):
+                metric_data = nib.load(metric).get_fdata()
+                metric_array[metric_name_list.index(metric_name)] = np.mean(metric_data[density_norm > 0])
+                weighted_metric_array[metric_name_list.index(metric_name)] = np.mean(metric_data[density_norm > 0] * density_norm[density_norm > 0])    
+            
+            if not os.path.exists(out_metric_file):
+                np.savetxt(out_metric_file, metric_array.T, delimiter=',', header=','.join(metric_name_list))
+
+            if not os.path.exists(out_weighted_metric_file):
+                np.savetxt(out_weighted_metric_file, weighted_metric_array.T, delimiter=',', header=','.join(metric_name_list))
 
     return
 
@@ -243,7 +286,7 @@ def main(argv):
     subList = []
     outDir = ''
     sfthres_init = 0.1
-    sfthres = 0.1
+    sfthres = 0.15
 
     for opt, arg in opts:
         if opt == '-h':
@@ -253,9 +296,9 @@ def main(argv):
             subDir = os.path.normpath(arg)
         elif opt in ("-o", "--outDir"):
             outDir = os.path.normpath(arg)
-        elif opt in ('--sfthres_init'):
+        elif opt == "--sfthres_init":
             sfthres_init = float(arg)
-        elif opt in ('--sfthres'):
+        elif opt == "--sfthres":
             sfthres = float(arg)
 
     # Get FA, MD and subcortical GM segmentation directory
@@ -269,6 +312,7 @@ def main(argv):
     # Create output directory if it doesn't exist
     if not os.path.exists(outDir):
         os.makedirs(outDir)
+
 
     run_cell_bridge_tractography(subDir, subID, outDir, sfthres=sfthres, sfthres_init=sfthres_init)
     
