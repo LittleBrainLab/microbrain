@@ -51,9 +51,10 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
     ad_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_AD' + fsl_ext())
     rd_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_RD' + fsl_ext())
     evec_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_EVECS' + fsl_ext())
+    eval_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_EVALS' + fsl_ext())
     pevec_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_Primary_Direction' + fsl_ext())
     tensor_fname = tensorDir + fbasename.replace(fsl_ext(), suffix + '_tensor' + fsl_ext())
-    if not os.path.exists(fa_fname):
+    if not os.path.exists(eval_fname):
 
         img = nib.load(fname)
         data = img.get_data()
@@ -110,6 +111,9 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells = [
 
         evecs_img = nib.Nifti1Image(tenfit.evecs.astype(np.float32), img.affine)
         nib.save(evecs_img, evec_fname)
+
+        evals_img = nib.Nifti1Image(tenfit.evals.astype(np.float32), img.affine)
+        nib.save(evals_img, eval_fname)
 
         lt_tensor = tenfit.lower_triangular()
         tensor_img = nib.Nifti1Image(lt_tensor*1000, img.affine)
