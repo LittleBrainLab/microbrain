@@ -21,7 +21,7 @@ from time import time
 from multiprocessing import Pool
 
 output_stream = sys.stdout
-procDir = '../../Data/Test_Data/CB_BRAIN_040_v2_smoothed/'
+procDir = '../Data/Test_Data/CB_BRAIN_040_v2_smoothed/'
 
 globalSurf = []
 globalCellLocator = []

@@ -10,7 +10,6 @@ from os import path
 import getopt
 import os
 import sys
-sys.path.append('../../microbrain/')
 
 
 # Check to see if program is installed to path and executable before running subprocess

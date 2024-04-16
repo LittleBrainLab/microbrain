@@ -15,10 +15,6 @@ from os import system
 import getopt
 import os
 import sys
-from pathlib import Path
-path_root = Path(__file__).parents[2]
-print(path_root)
-sys.path.append(str(path_root))
 
 
 def fsl_ext():
@@ -527,7 +523,7 @@ def main(argv):
 
             # Surface-based deformation cortical segmentation
             if cort_seg:
-                src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
+                src_tmp_freesurf_subdir = 'Data/TEMP_FS/'
                 tmp_freesurf_subdir = os.environ['SUBJECTS_DIR'] + \
                     '/MBRAIN_' + subID + '/'
                 os.system('cp -r ' + src_tmp_freesurf_subdir +
