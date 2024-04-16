@@ -34,5 +34,8 @@ sudo apt install python3-pip
 pip3 install nibabel --user
 pip3 install dipy --user
 pip3 install fury --user
+pip3 install itk --user
 
+#NLSAM for denosing and signal stabilization
+pip3 install https://github.com/samuelstjean/nlsam/archive/master.zip --user --process-dependency-links
 
