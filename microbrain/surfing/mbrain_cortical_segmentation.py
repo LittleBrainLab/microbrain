@@ -538,7 +538,7 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
     pseudo_white[binary_fill_holes(pseudo_white)] = 1
 
     fpseudo_white = surfDir + thisSub + suffix + '_initwm' + fsl_ext()
-    nib.save(nib.Nifti1Image(np.int8(pseudo_white), new_affine), fpseudo_white)
+    nib.save(nib.Nifti1Image(int8(pseudo_white), new_affine), fpseudo_white)
 
     # Separate into left and right hemispheres based on the center of mass of the thalamus
     thalamus_center = np.uint8(np.round(center_of_mass(thalamus_label)))
@@ -579,14 +579,14 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
     inter_mask[size_img == max(sizes)] = 0
     inter_mask[size_img != max(sizes)] = 1
 
-    nib.save(nib.Nifti1Image(np.int8(lh_pseudo_white), new_affine), fwm_lh)
+    nib.save(nib.Nifti1Image(int8(lh_pseudo_white), new_affine), fwm_lh)
 
-    nib.save(nib.Nifti1Image(np.int8(rh_pseudo_white), new_affine), fwm_rh)
+    nib.save(nib.Nifti1Image(int8(rh_pseudo_white), new_affine), fwm_rh)
 
-    nib.save(nib.Nifti1Image(np.int8(inter_mask), new_affine), finter)
+    nib.save(nib.Nifti1Image(int8(inter_mask), new_affine), finter)
 
     inter_mask[binary_dilation(binary_dilation(external_mask == 1))] = 0
-    nib.save(nib.Nifti1Image(np.int8(inter_mask), new_affine), finter_hippo)
+    nib.save(nib.Nifti1Image(int8(inter_mask), new_affine), finter_hippo)
 
     # Output distance maps for surface based cortical segmentation
     wm_prob_img = nib.load(fwm_prob)

@@ -128,7 +128,7 @@ def main(argv):
             outputDir = os.path.normpath(arg)
         elif opt in ("-b", "--bvalues"):
             dti_model = True
-            bval_list = np.fromstring(arg.strip('[]'), np.int, sep=',')
+            bval_list = np.fromstring(arg.strip('[]'), int, sep=',')
             shell_suffix = ''
             for shell in bval_list:
                 shell_suffix = shell_suffix + 'b' + str(shell)

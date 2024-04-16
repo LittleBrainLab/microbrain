@@ -4,3 +4,4 @@ fury
 scipy
 vtk
 matplotlib
+nlsam
