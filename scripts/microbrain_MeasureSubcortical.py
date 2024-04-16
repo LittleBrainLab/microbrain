@@ -30,10 +30,10 @@ def fsl_ext():
 
 def extract_FA_MD_from_subcortical_segmentations(subID, segDir, ffa, fmd):
     md_img = nib.load(fmd)
-    md_data = md_img.get_data()
+    md_data = md_img.get_fdata()
 
     fa_img = nib.load(ffa)
-    fa_data = fa_img.get_data()
+    fa_data = fa_img.get_fdata()
 
     subcort_label = ['LEFT_THALAMUS', 'RIGHT_THALAMUS', 'LEFT_CAUDATE',
                      'RIGHT_CAUDATE', 'LEFT_PUTAMEN', 'RIGHT_PUTAMEN', 'LEFT_GLOBUS2', 'RIGHT_GLOBUS2']
@@ -45,7 +45,7 @@ def extract_FA_MD_from_subcortical_segmentations(subID, segDir, ffa, fmd):
     for slabel, sind in zip(subcort_label, range(0, len(subcort_label))):
         fseg_vol = segDir + subID + '_refined_' + str(slabel) + fsl_ext()
         seg_img = nib.load(fseg_vol)
-        seg_data = seg_img.get_data()
+        seg_data = seg_img.get_fdata()
 
         thisFA[0, sind] = np.mean(fa_data[seg_data == 1])
         thisFAstd[0, sind] = np.std(fa_data[seg_data == 1])
@@ -60,12 +60,12 @@ def main(argv):
     subList = []
     outFile = ''
 
-    help_string = """usage: microbrain_MeasureSubcortical.py -s <subject_directory_list> -o outputFile 
-    description: microbrain_measureSubcortical.py outputs  
+    help_string = """usage: microbrain_MeasureSubcortical.py -s <subject_directory_list> -o outputFile
+    description: microbrain_measureSubcortical.py outputs
 
     mandatory arguments:
     -s <directory>,--subList= - specifies the list of directories (e.g. [SubDir1,SubDir2,SubDir3]) for which subcortical diffusion measurements will be taken
-    -o <outFile>, --outFile= - file for output 
+    -o <outFile>, --outFile= - file for output
     """
 
     try:

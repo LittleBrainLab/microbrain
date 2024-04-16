@@ -16,6 +16,8 @@ from dipy.io import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
 
 # Check to see if program is installed to path and executable before running subprocess
+
+
 def is_tool(name):
     return which(name) is not None
 
@@ -72,15 +74,15 @@ def dcm2nii(dataDir, outDir, rawDir, thisSub, mag_image=False, phase_image=False
                 return_code = process.returncode
             else:
                 print(
-                    "MicroBrain Setup: Could not find dcm2niix, make sure it is installed to your path")
+                    "microbrain Setup: Could not find dcm2niix, make sure it is installed to your path")
                 stdout = ''
                 return_code = 1
         else:
-            print("MicroBrain Setup: Could not find srcDir: " + dataDir)
+            print("microbrain Setup: Could not find srcDir: " + dataDir)
             stdout = ''
             return_code = 1
     else:
-        print("MicroBrain Setup: Dicom already converted skipping subject: " + thisSub)
+        print("microbrain Setup: Dicom already converted skipping subject: " + thisSub)
         stdout = ''
         return_code = 0
 
@@ -96,11 +98,11 @@ def main(argv):
     smooth_radius = 0
     input_fieldmap = ''
     input_reverse_pe = ''
-    make_bfiles=False
+    make_bfiles = False
 
     help_string = """usage: microbrain_setup.py -s <Subject Directory> [options]
-    description: microbrain_setup.py creates the subject data directory for downstream processing from a microbrain.py call. 
-    Three options exist for setting up the subject folder 
+    description: microbrain_setup.py creates the subject data directory for downstream processing from a microbrain.py call.
+    Three options exist for setting up the subject folder
     1) diffusion data no spatial distortion correction
     2) diffusion data spatial distortion correction with an additional dataset acquired with reverse phase encode
     3) diffusion data spatial distortion correction with a field map
@@ -110,13 +112,13 @@ def main(argv):
     mandatory arguments:
     -s <directory>,--subdir= - specifies the directory which microbrain will place all processed files
 
-    optional arguments: 
+    optional arguments:
     -i <dicom_directory>,--idcm=dicom_directory - uses dcm2niix to convert dicom files to NIFTI which are then placed in a newly created subject directory in the "orig" folder
-    
+
     --idcm_reversePE=dicom_directory - uses dcm2niix to convert reverse phase encode dicom to NIFTI, stores in "orig_reverse" folder
-    
+
     --idcm_fieldmap=[dicom_magnitude, dicom_phase, TE_difference] - uses dcm2niix to convert reverse phase encode dicom to NIFTI, calculates fieldmap (in hz) from magnitude/phase images and stores in "orig_fieldmap" folder. TE_difference is the difference in TE between first and second images, in default siemens sequence this value is usually 2.46 ms
-    
+
     --make_bfiles - if bval/bvec files are not generated in conversion step, assume only b0s and make bval/bvec files
 
     Examples Different Distortion Correction:
@@ -124,7 +126,7 @@ def main(argv):
     1) No spatial distortion correction, b1000
     python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory
     python3 microbrain.py -s path_to_subject_directory -b [0,1000] --all
-    
+
     2) Spatial Distortion Correction with reverse phase encode
     python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_reversePE=path_to_dicom_directory_with_reverse_PE_data
     python3 microbrain.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --all
@@ -167,7 +169,7 @@ def main(argv):
         elif opt in ("--idcm_fieldmap_smooth"):
             smooth_radius = int(arg)
         elif opt in ("--make_bfiles"):
-            make_bfiles=True
+            make_bfiles = True
 
     outputDir, subID = os.path.split(outputDir)
     print('Setting Up:' + subID)
@@ -204,21 +206,23 @@ def main(argv):
         origDir_reversePE = outputDir + '/' + subID + '/orig_reversePE/'
 
         # generate reverse PE bval/bvec files if only b0s
-        if make_bfiles: 
+        if make_bfiles:
             reversePE_data = nib.load(fdwi_reversePE).get_fdata()
             if not os.path.exists(fbval_reversePE):
-                print('MicroBrain: no bval file found, assuming reverse PE file are only b0 volumes')
+                print(
+                    'microbrain: no bval file found, assuming reverse PE file are only b0 volumes')
                 if len(reversePE_data.shape) == 3:
-                    reversePE_bvals =np.zeros((1,1))
+                    reversePE_bvals = np.zeros((1, 1))
                 else:
                     reversePE_bvals = np.zeros((1, reversePE_data.shape[3]))
                 np.savetxt(fbval_reversePE, reversePE_bvals, fmt="%d")
 
             if make_bfiles and not os.path.exists(fbvec_reversePE):
-                print('MicroBrain: no bval file found, assuming reverse PE file are only b0 volumes')
-                
+                print(
+                    'microbrain: no bval file found, assuming reverse PE file are only b0 volumes')
+
                 if len(reversePE_data.shape) == 3:
-                    reversePE_bvec =np.zeros((3,1))
+                    reversePE_bvec = np.zeros((3, 1))
                 else:
                     reversePE_bvec = np.zeros((3, reversePE_data.shape[3]))
                 np.savetxt(fbvec_reversePE, reversePE_bvec, fmt="%d")
@@ -275,7 +279,7 @@ def main(argv):
             print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
             sys.exit()
 
-        # After converting Siemens fieldmap, prepare it for use with MicroBrain Pipeline (i.e. calculate fieldmap from magnitude/phase images and convert to hz)
+        # After converting Siemens fieldmap, prepare it for use with microbrain Pipeline (i.e. calculate fieldmap from magnitude/phase images and convert to hz)
 
         # Average Magnitude images
         ffieldmap_mag2 = ffieldmap_mag1.replace(
@@ -288,14 +292,14 @@ def main(argv):
         ffieldmap_mag_brain1 = ffieldmap_mag.replace(fsl_ext(), '_brain1')
         process = subprocess.run(['bet', ffieldmap_mag, ffieldmap_mag_brain1,
                                  '-m', '-B'], stdout=subprocess.PIPE, universal_newlines=True)
-        #ffieldmap_mag_brain = ffieldmap_mag_brain + fsl_ext()
+        # ffieldmap_mag_brain = ffieldmap_mag_brain + fsl_ext()
 
         ffieldmap_mag_brain1_mask = ffieldmap_mag_brain1 + '_mask' + fsl_ext()
         ffieldmap_mag_brain_mask = ffieldmap_mag_brain1_mask.replace(
             'brain1_mask' + fsl_ext(), 'brain_mask' + fsl_ext())
         process = subprocess.run(['fslmaths', ffieldmap_mag_brain1_mask, '-kernel', 'box', '20',
                                  '-dilF', ffieldmap_mag_brain_mask], stdout=subprocess.PIPE, universal_newlines=True)
-        #process = subprocess.run(['fslmaths',ffieldmap_mag_brain1_mask,'-ero',ffieldmap_mag_brain_mask], stdout=subprocess.PIPE, universal_newlines=True)
+        # process = subprocess.run(['fslmaths',ffieldmap_mag_brain1_mask,'-ero',ffieldmap_mag_brain_mask], stdout=subprocess.PIPE, universal_newlines=True)
 
         ffieldmap_mag_brain = ffieldmap_mag_brain_mask.replace(
             '_mask' + fsl_ext(), fsl_ext())

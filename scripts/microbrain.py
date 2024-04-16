@@ -1,23 +1,25 @@
 #!/usr/local/bin/python
-import sys
-sys.path.append('../../MicroBrain/')
-
-import os
-import getopt
-from os import system
-from os import path
-from time import time
-import subprocess
-import numpy as np
-import nibabel as nib
-from dipy.io import read_bvals_bvecs
-from dipy.core.gradients import gradient_table
+from microbrain.preprocessing import mbrain_preproc
+from microbrain.modelling import mbrain_modelling
+from microbrain.subcort_segmentation import mbrain_segment
+from microbrain.surfing import mbrain_cortical_segmentation
 import dipy.reconst.dti as dti
+from dipy.core.gradients import gradient_table
+from dipy.io import read_bvals_bvecs
+import nibabel as nib
+import numpy as np
+import subprocess
+from time import time
+from os import path
+from os import system
+import getopt
+import os
+import sys
+from pathlib import Path
+path_root = Path(__file__).parents[2]
+print(path_root)
+sys.path.append(str(path_root))
 
-from MicroBrain.surfing import mbrain_cortical_segmentation
-from MicroBrain.subcort_segmentation import mbrain_segment
-from MicroBrain.modelling import mbrain_modelling
-from MicroBrain.preprocessing import mbrain_preproc
 
 def fsl_ext():
     fsl_extension = ''
@@ -67,7 +69,7 @@ def main(argv):
     proc_num = 0
 
     help_string = """usage: microbrain.py -s <Subject Directory> -b <bvaluelist> [options]
-    description: microbrain is a fully automated diffusion MRI analysis pipeline for measurement of grey matter microstructure.  
+    description: microbrain is a fully automated diffusion MRI analysis pipeline for measurement of grey matter microstructure.
     Note that options below require the installation of multiple neuroimaging/python analysis software packages (see install instructions).
     VERY BETA Version use with extreme caution. For trouble shooting help contact Graham Little (graham.little.phd@gmail.com)
 
@@ -75,17 +77,17 @@ def main(argv):
     -s <directory>,--subdir= - specifies the directory which microbrain will place all processed files
     -b [bval_list],--bvalues= - specify the bvalues to use for diffusion modelling and segmention (for example [0,1000] to use all b0 and b1000 volumes)
 
-    optional arguments: 
+    optional arguments:
     --mask-params=[f-value,g-value], --- sets the bet2 mask parameters default [0.3,0.0]
     --gibbs - perform gibbs ringing correction (Kellner et al., 2016) using included third party c program
     --stabilize - perform stabilization using algorithm provided by non-local spatial angular matching algo (NLSAM, St Jean et al., 2016)
     --dnlsam - perform denoising using non-local spatial angular matching (NLSAM, St Jean et al., 2016)
     --dmppca - performs MPPCA denoising (Veraart et al., 2016) via DIPY
     --eddy --eddy_cuda - performs eddy current correction (Anderson et al., 2016) via FSL v6.0 or higher. CUDA mode runs faster if CUDA setup on NVIDIA GPU
-    
+
     --pe_direction=phase_encode_direction - direction of diffusion data in orig directory. phase_encode_direction can be LR for left/right or AP for anterior / posterior and their opposite pairs.  Required for distortion correction using a fieldmap or reverse phase encode data
-    --AcqReadout= - Time between centre of first echo to centre of last echo as defined by FSL. Only required if using fieldmap spatial distortion correction 
-    --EffectiveEcho= - Time between centre of first echo to centre of last. Only required if using fieldmap spatial distortion correction 
+    --AcqReadout= - Time between centre of first echo to centre of last echo as defined by FSL. Only required if using fieldmap spatial distortion correction
+    --EffectiveEcho= - Time between centre of first echo to centre of last. Only required if using fieldmap spatial distortion correction
 
     --no-N4 - does not perform N4 correction (Tustison el al., 2010) via ANTS, useful flag when data is prescan normalized (Siemens)
     --no-json - if no .json image acquistion specification file available will run without this file
@@ -99,7 +101,7 @@ def main(argv):
     1) No spatial distortion correction, b1000
     python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory
     python3 microbrain.py -s path_to_subject_directory -b [0,1000] --all
-    
+
     2) Spatial Distortion Correction with reverse phase encode
     python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_reversePE=path_to_dicom_directory_with_reverse_PE_data
     python3 microbrain.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --all
@@ -112,7 +114,7 @@ def main(argv):
     try:
         # Note some of these options were left for testing purposes
         opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "bet-fval=", "bet-gval=", "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=", "rerun-mask",
-                                   "dmppca", "dmppca-radius=", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize","use-tensor-wm"])
+                                   "dmppca", "dmppca-radius=", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize", "use-tensor-wm"])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -184,7 +186,7 @@ def main(argv):
             cort_seg = True
         elif opt in ("--use-tensor-wm"):
             use_tensor_wm = True
-        elif opt in ("--freesurf-dir"): ## Not available currently
+        elif opt in ("--freesurf-dir"):  # Not available currently
             freesurfDir = os.path.normpath(arg)
 
     outputDir, subID = os.path.split(outputDir)
@@ -231,7 +233,7 @@ def main(argv):
             sys.exit()
 
         topup = True
-    
+
     fdwi = origDir + subID + fsl_ext()
     fbval = fdwi.replace(fsl_ext(), '.bval')
     fbvec = fdwi.replace(fsl_ext(), '.bvec')
@@ -264,7 +266,7 @@ def main(argv):
         fmd = fout.replace(fsl_ext(), '_MD' + fsl_ext())
         if not os.path.exists(fmd):
             fout_img = nib.load(fout)
-            fout_data = fout_img.get_data()
+            fout_data = fout_img.get_fdata()
 
             tolerance = 50
             b_idx = []
@@ -303,7 +305,7 @@ def main(argv):
 
     else:  # Create a mask inclusive of all voxels
         fout_img = nib.load(fout)
-        fout_data = fout_img.get_data()
+        fout_data = fout_img.get_fdata()
         fmask = fout.replace(fsl_ext(), '_fake_mask' + fsl_ext())
         fake_mask_data = np.ones(np.shape(np.squeeze(fout_data[:, :, :, 0])))
         nib.save(nib.Nifti1Image(fake_mask_data, fout_img.affine), fmask)
@@ -371,7 +373,7 @@ def main(argv):
         fb0s = fout.replace(fsl_ext(), '_b0vols' + fsl_ext())
         dwi_img = nib.load(fout)
         dwi_vol = dwi_img.get_fdata()
-        b0_vols = dwi_vol[:,:,:,np.logical_and(
+        b0_vols = dwi_vol[:, :, :, np.logical_and(
             bvals >= -20, bvals <= 20)]
         nib.save(nib.Nifti1Image(b0_vols, dwi_img.affine), fb0s)
 
@@ -408,7 +410,7 @@ def main(argv):
         if fieldmap:
             ffirstb0_brain = ffirstb0.replace(fsl_ext(), '_brain' + fsl_ext())
             process = subprocess.run(['bet', ffirstb0, ffirstb0_brain, '-m', '-f', str(
-                bet_fval),'-g',str(bet_gval)], stdout=subprocess.PIPE, universal_newlines=True)
+                bet_fval), '-g', str(bet_gval)], stdout=subprocess.PIPE, universal_newlines=True)
 
             if pe_direction == 'AP':
                 unwarp_direction = 'y-'
@@ -445,9 +447,9 @@ def main(argv):
             fmask_eddy = fmask_field
 
             # Fieldmap lies outside the b0 mask so dilate it
-            #fmask_dil = fmask.replace(fsl_ext(), '_dil' + fsl_ext())
-            #process = subprocess.run(['fslmaths', fmask, '-kernel', 'box', '15', '-dilF', fmask_dil], stdout=subprocess.PIPE, universal_newlines=True)
-            #fmask = fmask_dil
+            # fmask_dil = fmask.replace(fsl_ext(), '_dil' + fsl_ext())
+            # process = subprocess.run(['fslmaths', fmask, '-kernel', 'box', '15', '-dilF', fmask_dil], stdout=subprocess.PIPE, universal_newlines=True)
+            # fmask = fmask_dil
         else:
             fmask_eddy = fmask
 
@@ -493,15 +495,16 @@ def main(argv):
         ffirstb0_undistort = fout.replace(fsl_ext(), '_firstb0' + fsl_ext())
         if not os.path.exists(ffirstb0_undistort):
             fout_img = nib.load(fout)
-            fout_data = fout_img.get_data()
+            fout_data = fout_img.get_fdata()
 
-            b0_data = fout_data[:, :, :, np.logical_and(bvals >= -20, bvals <= 20)]
+            b0_data = fout_data[:, :, :, np.logical_and(
+                bvals >= -20, bvals <= 20)]
 
             firstb0_data = b0_data[:, :, :, 0]
-            
+
             nib.save(nib.Nifti1Image(firstb0_data,
-                    fout_img.affine), ffirstb0_undistort)
-            
+                                     fout_img.affine), ffirstb0_undistort)
+
             fout_img.uncache()
             del fout_data
 
@@ -520,17 +523,21 @@ def main(argv):
         # Surface-based deformation subcortical segmentation
         if diffusion_seg:
             meshDir, voxelDir = mbrain_segment.segment(outputDir, subID, preproc_suffix,
-                                   shell_suffix, cpu_num=proc_num)
-            
+                                                       shell_suffix, cpu_num=proc_num)
+
             # Surface-based deformation cortical segmentation
             if cort_seg:
                 src_tmp_freesurf_subdir = '../Data/TEMP_FS/'
-                tmp_freesurf_subdir = os.environ['SUBJECTS_DIR'] +  '/MBRAIN_' + subID + '/'
-                os.system('cp -r ' + src_tmp_freesurf_subdir + ' ' + tmp_freesurf_subdir)
+                tmp_freesurf_subdir = os.environ['SUBJECTS_DIR'] + \
+                    '/MBRAIN_' + subID + '/'
+                os.system('cp -r ' + src_tmp_freesurf_subdir +
+                          ' ' + tmp_freesurf_subdir)
                 if use_tensor_wm:
-                    mbrain_cortical_segmentation.generate_surfaces_from_dwi(fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num, use_tensor_wm=True)
+                    mbrain_cortical_segmentation.generate_surfaces_from_dwi(
+                        fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num, use_tensor_wm=True)
                 else:
-                    mbrain_cortical_segmentation.generate_surfaces_from_dwi(fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num)
+                    mbrain_cortical_segmentation.generate_surfaces_from_dwi(
+                        fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num)
                 os.system('rm -r ' + tmp_freesurf_subdir)
 
     print("Total time for processing: ", time() - total_t_start)
