@@ -35,10 +35,10 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
     if not os.path.exists(mask_dir):
         os.makedirs(mask_dir)
 
-    # Create tracking mask from mbrain segmentation
+    # Create tracking mask from microbrain segmentation
     fmask_tracking_float = mask_dir + '/whole_brain_tracking_mask.nii.gz'
     if not os.path.exists(fmask_tracking_float):
-        os.system('python microbrain_export_wm_tracking_mask.py -s ' +
+        os.system('microbrain_export_wm_tracking_mask.py -s ' +
                   subDir + ' -o ' + fmask_tracking_float)
 
     # Convert mask to int

@@ -37,7 +37,7 @@ def run_wb_tractography(subDir, subID, outDir):
     # Create tracking mask from mbrain segmentation
     fmask_tracking_float = mask_dir + '/whole_brain_tracking_mask.nii.gz'
     if not os.path.exists(fmask_tracking_float):
-        os.system('python microbrain_export_wm_tracking_mask.py -s ' +
+        os.system('microbrain_export_wm_tracking_mask.py -s ' +
                   subDir + ' -o ' + fmask_tracking_float)
 
     # Convert mask to int
