@@ -61,6 +61,8 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells=[0,
         fbasename.replace(fsl_ext(), suffix + '_RD' + fsl_ext())
     evec_fname = tensorDir + \
         fbasename.replace(fsl_ext(), suffix + '_EVECS' + fsl_ext())
+    eval_fname = tensorDir + \
+        fbasename.replace(fsl_ext(), suffix + '_EVALS' + fsl_ext())
     pevec_fname = tensorDir + \
         fbasename.replace(fsl_ext(), suffix + '_Primary_Direction' + fsl_ext())
     tensor_fname = tensorDir + \
