@@ -4,9 +4,9 @@ microbrain is a fully automated diffusion MRI analysis pipeline for measurement 
 Subcortical/Cortical segmentation methods (Little 2023 Bioarxiv, Little 2021 NeuroImage) will be added soon.
 
 # Installation
-pip install -r requirements.txt
+pip install -r requirements.txt <\n>
 pip install -e .
 
 # Example Usage
-microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory
+microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory <\n>
 microbrain_run.py -s path_to_subject_directory -b [0,1000] --gibbs --eddy --mbrain-seg --mbrain-cort
