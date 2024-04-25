@@ -330,7 +330,7 @@ def main(argv):
             fout, preprocDir)
         if returncode != 0:
             print(
-                'DSurfer: unring.a64 returned an error, make sure it is installed correctly')
+                'microbrain: unring.a64 returned an error, make sure it is installed correctly')
             sys.exit()
 
         preproc_suffix = preproc_suffix + '_GR'
@@ -460,7 +460,7 @@ def main(argv):
             fout, facq, findex, fmask_eddy, fbval, fbvec, fjson, ftopup, ffieldmap_hz_reg2firstb0, cuda, preprocDir, preprocDir + 'eddy_output_files/')
         if returncode != 0:
             print(
-                "DSurfer: FSL's eddy returned an error, make sure it is installed correctly")
+                "microbrain: FSL's eddy returned an error, make sure it is installed correctly")
             sys.exit()
 
         # update bvecs with rotated version from eddy correction
@@ -510,7 +510,7 @@ def main(argv):
                 ffirstb0_undistort, fmask, fout, bvals, bval_list, meanDWIDir, preproc_suffix, dwi_shell=bval_list[-1])
             if returncode != 0:
                 print(
-                    "DSurfer: N4 returned an error, make sure it is installed correctly")
+                    "microbrain: N4 returned an error, make sure it is installed correctly")
                 sys.exit()
         else:
             fb0, fb0_n4, fdwi, fdwi_n4 = mbrain_preproc.output_DWI_maps_noN4(
@@ -523,11 +523,17 @@ def main(argv):
 
             # Surface-based deformation cortical segmentation
             if cort_seg:
-                src_tmp_freesurf_subdir = 'Data/TEMP_FS/'
+                src_tmp_freesurf_subdir = os.path.dirname(
+                    os.path.abspath(__file__)) + '/Data/TEMP_FS/'
                 tmp_freesurf_subdir = os.environ['SUBJECTS_DIR'] + \
                     '/MBRAIN_' + subID + '/'
                 os.system('cp -r ' + src_tmp_freesurf_subdir +
                           ' ' + tmp_freesurf_subdir)
+
+                print(os.path.abspath(__file__))
+                print(os.path.dirname(os.path.abspath(__file__)))
+                print(src_tmp_freesurf_subdir)
+
                 if use_tensor_wm:
                     mbrain_cortical_segmentation.generate_surfaces_from_dwi(
                         fmask, voxelDir, outputDir, subID, preproc_suffix, shell_suffix, tmp_freesurf_subdir, cpu_num=proc_num, use_tensor_wm=True)

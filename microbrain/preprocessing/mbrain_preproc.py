@@ -60,7 +60,7 @@ def gibbsRingingCorrection(fdwi, gibbsDir):
             return_code = process.returncode
         else:
             print(
-                "DSurfer Preproc: Could not find unring.a64, make sure it is installed to your path")
+                "microbrain Preproc: Could not find unring.a64, make sure it is installed to your path")
             stdout = ''
             return_code = 1
     else:
@@ -334,11 +334,11 @@ def fslv6p0_brain_mask(fgibbs, bvals, fval, gval, tolerance=100):
             return_code = process.returncode
         else:
             print(
-                "DSurfer Preproc: Could not find bet2, make sure FSLv6.0 or greater is installed to your path")
+                "microbrain Preproc: Could not find bet2, make sure FSLv6.0 or greater is installed to your path")
             stdout = ''
             return_code = 1
     else:
-        print("DSurfer Preproc: BET2 masking already performed skipping")
+        print("microbrain Preproc: BET2 masking already performed skipping")
         stdout = ''
         return_code = 0
 
@@ -422,7 +422,7 @@ def fslv6p0_eddy(fdwi, facq, findex, fmask, fbval, fbvec, fjson, ftopup,  ffield
 
             print("Eddy Current/Motion Finished, Processing Time: ", time() - t)
         else:
-            print("DSurfer Preproc: Could not find " + eddy_command +
+            print("microbrain Preproc: Could not find " + eddy_command +
                   ", make sure FSLv6.0 or greater is installed to your path")
             stdout = ''
             return_code = 1
@@ -486,7 +486,7 @@ def n4correct_by_b0(fb0avg, fmask, fgibbs, preprocDWIDir):
             return_code = process.returncode
         else:
             print(
-                "DSurfer Preproc: Could not find N4, make sure it is installed to your path")
+                "microbrain Preproc: Could not find N4, make sure it is installed to your path")
             stdout = ''
             return_code = 1
     else:
@@ -544,7 +544,7 @@ def output_DWI_maps(fb0avg, fmask, feddy, bvals, shells, meanDWIDir, preproc_suf
             return_code = process.returncode
         else:
             print(
-                "DSurfer Preproc: Could not find N4, make sure it is installed to your path")
+                "microbrain Preproc: Could not find N4, make sure it is installed to your path")
             stdout = ''
             return_code = 1
     else:

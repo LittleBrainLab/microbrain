@@ -195,13 +195,13 @@ def main(argv):
         [fdwi, fbval, fbvec, fjson, stdout, returncode] = dcm2nii(
             inputDir, outputDir, 'orig_normalPE/', subID)
         if returncode != 0:
-            print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
+            print('microbrain: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
             sys.exit()
 
         [fdwi_reversePE, fbval_reversePE, fbvec_reversePE, fjson_reversePE, stdout,
             returncode] = dcm2nii(inputDir_reversePE, outputDir, 'orig_reversePE/', subID)
         if returncode != 0:
-            print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
+            print('microbrain: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
             sys.exit()
         origDir_reversePE = outputDir + '/' + subID + '/orig_reversePE/'
 
@@ -262,21 +262,21 @@ def main(argv):
         [fdwi, fbval, fbvec, fjson, stdout, returncode] = dcm2nii(
             inputDir, outputDir, 'orig/', subID)
         if returncode != 0:
-            print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
+            print('microbrain: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
             sys.exit()
 
         # Convert magnitude image
         [ffieldmap_mag1, fnotbval, fnotbvec, ffieldmap_mag_json, stdout, returncode] = dcm2nii(
             fieldmapDir_mag, outputDir, 'orig_fieldmap/', subID, True, False)
         if returncode != 0:
-            print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
+            print('microbrain: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
             sys.exit()
 
         # Convert phase image
         [ffieldmap_phase, fnotbval, fnotbvec, ffieldmap_phase_json, stdout, returncode] = dcm2nii(
             fieldmapDir_phase, outputDir, 'orig_fieldmap/', subID, False, True)
         if returncode != 0:
-            print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
+            print('microbrain: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
             sys.exit()
 
         # After converting Siemens fieldmap, prepare it for use with microbrain Pipeline (i.e. calculate fieldmap from magnitude/phase images and convert to hz)
@@ -325,7 +325,7 @@ def main(argv):
         [fdwi, fbval, fbvec, fjson, stdout, returncode] = dcm2nii(
             inputDir, outputDir, 'orig/', subID)
         if returncode != 0:
-            print('DSurfer: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
+            print('microbrain: dcm2niix returned an error, make sure it is installed correctly and that dicom files exist')
             sys.exit()
 
 
