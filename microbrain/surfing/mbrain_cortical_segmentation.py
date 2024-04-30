@@ -302,11 +302,11 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
     ftemplate = os.environ['FSLDIR'] + \
         '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
     fgm = root_dir + \
-        '/Data/tissuepriors/avg152T1_gm_resampled.nii'
+        '/data/tissuepriors/avg152T1_gm_resampled.nii.gz'
     fwm = root_dir + \
-        '/Data/tissuepriors/avg152T1_wm_resampled.nii'
+        '/data/tissuepriors/avg152T1_wm_resampled.nii.gz'
     fcsf = root_dir + \
-        '/Data/tissuepriors/avg152T1_csf_resampled.nii'
+        '/data/tissuepriors/avg152T1_csf_resampled.nii.gz'
 
     ffa = subDir + 'DTI_maps/' + thisSub + suffix + '_FA' + fsl_ext()
 
