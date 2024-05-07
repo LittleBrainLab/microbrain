@@ -6,3 +6,4 @@ matplotlib
 nlsam==0.7
 open3d-cpu
 scikit-image
+scilpy @ git+https://github.com/grahamlittlephd/repo@mesh_based_local_tracking
