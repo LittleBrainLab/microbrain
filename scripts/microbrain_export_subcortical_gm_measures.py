@@ -9,11 +9,6 @@ from shutil import which
 import numpy as np
 import nibabel as nib
 
-from dipy.io import read_bvals_bvecs
-from dipy.core.gradients import gradient_table
-
-# Check to see if program is installed to path and executable before running subprocess
-
 
 def is_tool(name):
     """
