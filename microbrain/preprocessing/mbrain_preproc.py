@@ -18,8 +18,6 @@ from dipy.core.gradients import gradient_table
 
 import microbrain.utils.surf_util as sutil
 
-# Check to see if program is installed to path and executable before running subprocess
-
 
 def is_tool(name):
     return which(name) is not None

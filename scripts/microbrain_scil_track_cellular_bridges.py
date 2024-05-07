@@ -9,9 +9,6 @@ import sys
 from glob import glob
 
 
-# Check to see if program is installed to path and executable before running subprocess
-
-
 def is_tool(name):
     """
     Check whether `name` is on PATH and marked as executable.

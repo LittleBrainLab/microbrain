@@ -42,7 +42,6 @@ RIGHT_STRIATUM_IDX = 166
 VENT_IDX = 200
 
 
-# move these functions to mbrain_io.py
 def is_tool(name):
     """
     Checks to see if third party binary is installed and accessible by command line

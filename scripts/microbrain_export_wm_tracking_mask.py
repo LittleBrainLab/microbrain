@@ -13,9 +13,6 @@ import sys
 import glob
 
 
-# Check to see if program is installed to path and executable before running subprocess
-
-
 def is_tool(name):
     """
     Check whether `name` is on PATH and marked as executable.
@@ -74,7 +71,7 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
     -------
     none
     """
-    
+
     # Convert LH and RH wm mesh to mask
     fdwi = segDir + '/voxel_output/' + subID + '_refined_LEFT_STRIATUM' + fsl_ext()
 
