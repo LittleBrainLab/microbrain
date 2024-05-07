@@ -16,8 +16,6 @@ import inspect
 import vtk
 from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 
-import matplotlib.pyplot as plt
-
 from os import system
 import subprocess
 

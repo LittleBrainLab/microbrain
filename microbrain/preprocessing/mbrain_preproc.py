@@ -1,7 +1,5 @@
 #!/usr/local/bin/python
 import os
-import glob
-from os import system
 from os import path
 from time import time
 import subprocess
