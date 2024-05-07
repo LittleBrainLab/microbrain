@@ -16,10 +16,33 @@ import sys
 
 
 def is_tool(name):
+    """
+    Check whether `name` is on PATH and marked as executable.
+
+    Parameters
+    ----------
+    name : str
+        The name of the program to check.
+
+    Returns
+    -------
+    bool
+        `True` if `name` is executable, `False` otherwise.
+    """
+
     return which(name) is not None
 
 
 def fsl_ext():
+    """
+    Returns the FSL output type extension
+
+    Returns
+    -------
+    fsl_extension : str
+        The FSL output type extension
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -29,7 +52,24 @@ def fsl_ext():
 
 
 def run_wb_tractography(subDir, subID, outDir):
+    """
+    Run whole brain tractography using scilpy tools and white matter mask created from mbrain-seg and mbrain-cort
 
+    Parameters
+    ----------
+    subDir : str
+        The subject directory
+    subID : str
+        The subject ID
+    outDir : str
+        The output directory
+
+    Returns
+    -------
+    none
+    """
+
+    
     mask_dir = outDir + '/tracking_mask'
     if not os.path.exists(mask_dir):
         os.makedirs(mask_dir)
