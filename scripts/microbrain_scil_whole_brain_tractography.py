@@ -1,10 +1,4 @@
 #!/usr/local/bin/python
-from scipy.ndimage import binary_fill_holes
-from microbrain.utils import surf_util as sutil
-from dipy.core.gradients import gradient_table
-from dipy.io import read_bvals_bvecs
-import nibabel as nib
-import numpy as np
 from shutil import which
 from os import path
 import getopt
@@ -69,7 +63,7 @@ def run_wb_tractography(subDir, subID, outDir):
     none
     """
 
-    
+
     mask_dir = outDir + '/tracking_mask'
     if not os.path.exists(mask_dir):
         os.makedirs(mask_dir)
