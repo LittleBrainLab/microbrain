@@ -15,6 +15,7 @@ from os import system
 import getopt
 import os
 import sys
+import inspect
 
 
 def fsl_ext():
@@ -24,6 +25,24 @@ def fsl_ext():
     elif os.environ['FSLOUTPUTTYPE'] == 'NIFTI_GZ':
         fsl_extension = '.nii.gz'
     return fsl_extension
+
+
+def get_temp_fs_dir():
+    """
+    Return temporary freesurf directory in microbrain repository
+
+    Returns
+    -------
+    tmp_fs_dir: string
+        tmp fs path
+    """
+
+    import microbrain  # ToDo. Is this the only way?
+    module_path = inspect.getfile(microbrain)
+
+    tmp_fs_dir = os.path.dirname(module_path) + "/data/TEMP_FS/"
+
+    return tmp_fs_dir
 
 
 def main(argv):
@@ -523,16 +542,14 @@ def main(argv):
 
             # Surface-based deformation cortical segmentation
             if cort_seg:
-                src_tmp_freesurf_subdir = os.path.dirname(
-                    os.path.abspath(__file__)) + '/Data/TEMP_FS/'
+                src_tmp_freesurf_subdir = get_temp_fs_dir()
                 tmp_freesurf_subdir = os.environ['SUBJECTS_DIR'] + \
                     '/MBRAIN_' + subID + '/'
                 os.system('cp -r ' + src_tmp_freesurf_subdir +
                           ' ' + tmp_freesurf_subdir)
 
-                print(os.path.abspath(__file__))
-                print(os.path.dirname(os.path.abspath(__file__)))
-                print(src_tmp_freesurf_subdir)
+                print("Source: " + src_tmp_freesurf_subdir)
+                print("TempFS: " + tmp_freesurf_subdir)
 
                 if use_tensor_wm:
                     mbrain_cortical_segmentation.generate_surfaces_from_dwi(

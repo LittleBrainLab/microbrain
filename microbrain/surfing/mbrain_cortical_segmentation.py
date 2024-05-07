@@ -12,6 +12,7 @@ from scipy import ndimage
 from os import system, environ, path
 
 import os
+import inspect
 import vtk
 from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 
@@ -22,6 +23,18 @@ import subprocess
 
 
 def fsl_ext():
+    """
+    Gets the preferred image extension used by FSL
+
+    Parameters
+    ----------
+    none
+
+    Returns
+    -------
+    extension: a string containing the preferred output
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -30,7 +43,39 @@ def fsl_ext():
     return fsl_extension
 
 
+def get_tissue_dir():
+    """
+    Return tissue directory in microbrain repository
+
+    Returns
+    -------
+    tissue_dir: string
+        tissue path
+    """
+
+    import microbrain  # ToDo. Is this the only way?
+    module_path = inspect.getfile(microbrain)
+
+    tissue_dir = os.path.dirname(module_path) + "/data/tissuepriors/"
+
+    return tissue_dir
+
 def vtktogii(vtk_fname, giiT, giiT2, C):
+    """
+    Convert vtk file to gii file
+
+    Parameters
+    ----------
+    vtk_fname: filename of vtk file
+        giiT: string
+        giiT2: string
+        C: string
+
+        Returns
+        -------
+        gii_fname: string
+            filename of gii file
+    """
     gii_fname = vtk_fname.replace('.vtk', '.surf.gii')
     tempgii_fname = gii_fname.replace('.surf.gii', '.temp.surf.gii')
     os.system('mirtk convert-pointset ' + vtk_fname +
@@ -301,12 +346,9 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
 
     ftemplate = os.environ['FSLDIR'] + \
         '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
-    fgm = root_dir + \
-        '/data/tissuepriors/avg152T1_gm_resampled.nii.gz'
-    fwm = root_dir + \
-        '/data/tissuepriors/avg152T1_wm_resampled.nii.gz'
-    fcsf = root_dir + \
-        '/data/tissuepriors/avg152T1_csf_resampled.nii.gz'
+    fgm = get_tissue_dir() + 'avg152T1_gm_resampled.nii.gz'
+    fwm = get_tissue_dir() + 'avg152T1_wm_resampled.nii.gz'
+    fcsf = get_tissue_dir() + 'avg152T1_csf_resampled.nii.gz'
 
     ffa = subDir + 'DTI_maps/' + thisSub + suffix + '_FA' + fsl_ext()
 
@@ -1020,121 +1062,5 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
                           'MIDTHICKNESS', 'CORTEX_LEFT')
     rh_mid_gii = vtktogii(rh_mid_fname, 'ANATOMICAL',
                           'MIDTHICKNESS', 'CORTEX_RIGHT')
-
-    return
-
-    # for hemi in ['lh','rh']:
-    #     if hemi == 'lh':
-    #         hemi_letter = 'L'
-    #         C = 'CORTEX_LEFT'
-    #         wm_vtk = lh_wm_fname
-    #         pial_vtk = lh_pial_fname
-    #         wm_gii = lh_wm_gii
-    #         pial_gii = lh_pial_gii
-    #     else:
-    #         hemi_letter = 'R'
-    #         C = 'CORTEX_RIGHT'
-    #         wm_vtk = rh_wm_fname
-    #         pial_vtk = rh_pial_fname
-    #         wm_gii = rh_wm_gii
-    #         pial_gii = rh_pial_gii
-
-    #     # Export mask as gii file
-    #     mask_gii = surfDir + thisSub + suffix + 'mask_' + hemi + '.native.shape.gii'
-    #     giimap(wm_vtk, mask_gii, 'Mask', 'Mask', C, flip=False)
-    #     os.system("wb_command -metric-math 'ceil(mask)' " + mask_gii + ' -var mask ' + mask_gii)
-
-    #     # Curvature using White matter surface
-    #     print("Processing Curvature on WM surface")
-    #     curv_vtk = wm_vtk.replace('.vtk','.curvature.vtk')
-    #     curv_gii = wm_gii.replace('.surf.gii','.curvature.native.shape.gii')
-    #     if not os.path.exists(curv_vtk):
-    #         os.system('mirtk calculate-surface-attributes ' + wm_vtk + ' ' + curv_vtk + ' -H Curvature -smooth-weighting Combinatorial -smooth-iterations 10 -vtk-curvatures')
-    #         os.system('mirtk calculate ' + curv_vtk + ' -mul -1 -scalars Curvature -out ' + curv_vtk)
-    #         giimap(curv_vtk, curv_gii, 'Curvature', 'Curvature', C)
-    #         os.system('wb_command -metric-dilate ' + curv_gii + ' ' + wm_gii + ' 10 ' + curv_gii + ' -nearest')
-
-    # # Calculating Cortical Thickness
-    # print("Calculating Thickness")
-    # thick_vtk = wm_vtk.replace('.vtk','.thickness.vtk')
-    # dist1_vtk = wm_vtk.replace('.vtk','.dist1.vtk')
-    # dist2_vtk = wm_vtk.replace('.vtk','.dist2.vtk')
-    # thick_gii = wm_gii.replace('.surf.gii','.thickness.native.shape.gii')
-    # if not os.path.exists(thick_vtk):
-    #     os.system('mirtk evaluate-distance ' + wm_vtk + ' ' + pial_vtk + ' ' + dist1_vtk + ' -name Thickness')
-    #     os.system('mirtk evaluate-distance ' + pial_vtk + ' ' + wm_vtk + ' ' + dist2_vtk + ' -name Thickness')
-    #     os.system('mirtk calculate ' + dist1_vtk + ' -scalars Thickness -add ' + dist2_vtk + ' Thickness -div 2 -o ' + thick_vtk)
-    #     giimap(thick_vtk, thick_gii, 'Thickness', 'Thickness', C)
-    #     os.system('wb_command -metric-dilate ' + thick_gii + ' ' + wm_gii + ' 10 ' + thick_gii + ' -nearest')
-
-    # print("Inflating WM surface for visualization")
-    # wm_smooth_gii = wm_gii.replace('.surf.gii','.gaussSmooth.surf.gii')
-    # veryinflate_gii = wm_gii.replace('.surf.gii','.veryinflated.surf.gii')
-    # if not os.path.exists(veryinflate_gii):
-    #     os.system('mirtk smooth-surface ' + wm_gii + ' ' + wm_smooth_gii + ' -points -iterations 1000 -gaussian 10.0')
-    #     os.system('wb_command -set-structure ' + wm_smooth_gii + ' ' + C + ' -surface-type VERY_INFLATED -surface-secondary-type GRAY_WHITE')
-    #     os.system('wb_command -surface-inflation ' + wm_gii + ' ' + wm_smooth_gii + ' 30 1.0 2 1.05 ' + veryinflate_gii)
-
-    # print("Inflating WM surface for registration")
-    # wm_inflate2_vtk = wm_vtk.replace('.vtk','.inflated_for_sphere.vtk')
-    # wm_sulc_gii = thick_gii.replace('thickness','sulc')
-    # if not os.path.exists(wm_inflate2_vtk):
-    #     wm_nostatus_vtk = wm_vtk.replace('.vtk','.nostatus.vtk')
-    #     os.system('mirtk delete-pointset-attributes ' + wm_vtk + ' ' + wm_nostatus_vtk + ' -name InitialStatus')
-    #     os.system('mirtk deform-mesh ' + wm_nostatus_vtk + ' ' + wm_inflate2_vtk + ' -inflate-brain -track SulcalDepth')
-    #     giimap(wm_inflate2_vtk, wm_sulc_gii, 'SulcalDepth', 'Sulc', C)
-    # wm_inflate2_gii = vtktogii(wm_inflate2_vtk, 'INFLATED', 'GRAY_WHITE',C)
-
-    # print("Extracting Spherical Surface")
-    # wm_sphere_gii = wm_inflate2_gii.replace('.surf.gii','.sphere.surf.gii')
-    # if not os.path.exists(wm_sphere_gii):
-    #    freesurfer_mris_sphere(wm_gii, wm_inflate2_gii, wm_sphere_gii, hemi, C, freesurf_subdir)
-    #
-    # print("Register using MSM spherical registration FSL 6.0")
-    # fs_LR_dir = '/home/graham/Software/NeuroSoftware/HCPpipelines-master/global/templates/standard_mesh_atlases/'
-    # ref_sphere_gii = fs_LR_dir + 'fsaverage.' + hemi_letter + '_LR.spherical_std.164k_fs_LR.rotzyx.surf.gii'
-    # ref_sulc_gii = fs_LR_dir +  hemi_letter + '.refsulc.164k_fs_LR.shape.gii'
-
-    # out_base = surfDir + thisSub + suffix + hemi
-    # out_reg = out_base + '.sphere.reg.surf.gii'
-
-    # if not os.path.exists(out_reg):
-    #
-    #    # Then register using sulc maps using the above registration as starting positioni
-    #    wm_sulc_mask_gii = wm_sulc_gii.replace('.native.shape.gii','-masked.native.shape.gii')
-    #    os.system("wb_command -metric-math 'x*mask' " + wm_sulc_mask_gii + ' -var x ' + wm_sulc_gii + ' -var mask ' + mask_gii + ' -repeat')
-    #
-    #    #wm_smooth_sulc_gii = wm_sulc_gii.replace('.native.shape.gii','-smoothed.native.shape.gii')
-    #    #os.system('wb_command -metric-smoothing ' + wm_gii + ' ' + wm_sulc_mask_gii + ' 8 ' + wm_smooth_sulc_gii)
-
-    #    #wm_sulc_only_gii = wm_sulc_gii.replace('.native.shape.gii','-sulcmask.native.shape.gii')
-    #    #os.system("wb_command -metric-math 'x * (x < 0)' " + wm_sulc_only_gii + ' -var x ' + wm_smooth_sulc_gii)
-
-    #    msm_reg(wm_sphere_gii, ref_sphere_gii, wm_sulc_gii, ref_sulc_gii, out_base, 'DiffusionSurfaceConfiguration')
-    #    os.system('wb_command -set-structure ' + out_reg + ' ' + C + ' -surface-type SPHERICAL -surface-secondary-type GRAY_WHITE')
-
-    # ATLASDIR = '/media/graham/DATA2/Cortical_Anisotropy/Data/Atlas/'
-    # atlas_fname =  ATLASDIR + 'fslr.' + hemi + '.aparc.label.gii '
-    # atlas_list = ['','']
-    # atlas_list[0] = ATLASDIR + 'Conte69_atlas-v2.LR.164k_fs_LR.wb/Conte69_atlas_164k_wb/parcellations_VGD11b.' + hemi_letter + '.164k_fs_LR.label.gii'
-    # atlas_list[1] = ATLASDIR + 'Conte69_atlas-v2.LR.164k_fs_LR.wb/Conte69_atlas_164k_wb/brodmann-lobes.' + hemi_letter + '.164K_fs_LR.label.gii'
-    #
-    # out_parc_list = ['','']
-    # out_parc_list[0] = out_base + hemi + '.parcellations_VGD11b.164k_fs_LR.label.gii'
-    # out_parc_list[1] = out_base + hemi + '.brodmann-lobes.164K_fs_LR.label.gii'
-    # for atlas_ind in range(0,len(atlas_list)):
-    #    atlas_fname = atlas_list[atlas_ind]
-    #    out_parc = out_parc_list[atlas_ind]
-    #
-    #    #if not os.path.exists(out_parc):
-    #    os.system('wb_command -label-resample ' + atlas_fname + ' ' + ref_sphere_gii + ' ' + out_reg + ' BARYCENTRIC ' + out_parc + ' -largest')
-    #    #os.system('msmresample ' + out_reg + ' ' + out_parc + ' -labels ' + atlas_fname + ' -project ' + wm_sphere_gii)
-
-    # out_brodmann = out_parc_list[1]
-    # out_brodmann_dilate = out_brodmann.replace('.label.gii','-dilate.label.gii')
-    # os.system('wb_command -label-dilate ' + out_brodmann + ' ' + wm_gii + ' 20 ' + out_brodmann_dilate)
-
-    # out_brodmann_dilate_mask = out_brodmann_dilate.replace('.label.gii','-mask.label.gii')
-    # os.system("wb_command -label-mask " + out_brodmann_dilate + ' ' + mask_gii + ' ' + out_brodmann_dilate_mask)
 
     return

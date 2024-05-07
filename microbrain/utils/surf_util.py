@@ -502,9 +502,9 @@ def interpolate_voldata_to_surface(surfVTK, meanDiffVTK, sformMat, pntDataName='
     interpData = surfVTK_interp_voxel.GetPointData().GetArray("NIFTI")
 
     # Needed to put in a tie break because probe was returning 0.5 decimal values in categorical case
-    # Note that value is cast to int32 this is because numpy_to_vtk blew up with int8 input.
+    # Note that value is cast to int this is because numpy_to_vtk blew up with int8 input.
     if categorical:
-        interpData = numpy_to_vtk(int32(np.ceil(vtk_to_numpy(interpData))))
+        interpData = numpy_to_vtk(np.int32(np.ceil(vtk_to_numpy(interpData))))
 
     interpData.SetName(pntDataName)
     surfVTK.GetPointData().AddArray(interpData)
