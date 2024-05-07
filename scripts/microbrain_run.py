@@ -10,8 +10,6 @@ import nibabel as nib
 import numpy as np
 import subprocess
 from time import time
-from os import path
-from os import system
 import getopt
 import os
 import sys
@@ -19,6 +17,15 @@ import inspect
 
 
 def fsl_ext():
+    """
+    Check to see if FSL is outputting nifti or nifti_gz files
+
+    Returns
+    -------
+    str : fsl_extension
+        Returns the FSL output extension for nifti or nifti_gz files
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -46,7 +53,15 @@ def get_temp_fs_dir():
 
 
 def main(argv):
-    inputDir = ''
+    """
+    Main function for microbrain pipeline
+
+    Parameters
+    ----------
+    argv : list
+        List of command line arguments
+    """
+
     outputDir = ''
     bval_list = []
 
@@ -59,7 +74,6 @@ def main(argv):
 
     bet_fval = 0.3
     bet_gval = 0.0
-    rerun_mask = False
     stabilize = False
     dnlsam = False
     dmppca = False
@@ -79,12 +93,11 @@ def main(argv):
     diffusion_seg = False
     cort_seg = False
     use_tensor_wm = False
-    freesurfDir = False
     N4 = True  # By default do N4 correction on DWI image based on the bias field from b0
     proc_num = 0
 
-    help_string = """usage: microbrain.py -s <Subject Directory> -b <bvaluelist> [options]
-    description: microbrain is a fully automated diffusion MRI analysis pipeline for measurement of grey matter microstructure.
+    help_string = """usage: microbrain_run.py -s <Subject Directory> -b <bvaluelist> [options]
+    description: microbrain is a fully automated diffusion MRI analysis pipeline for measurement of gray matter microstructure.
     Note that options below require the installation of multiple neuroimaging/python analysis software packages (see install instructions).
     VERY BETA Version use with extreme caution. For trouble shooting help contact Graham Little (graham.little.phd@gmail.com)
 
@@ -93,43 +106,55 @@ def main(argv):
     -b [bval_list],--bvalues= - specify the bvalues to use for diffusion modelling and segmention (for example [0,1000] to use all b0 and b1000 volumes)
 
     optional arguments:
-    --mask-params=[f-value,g-value], --- sets the bet2 mask parameters default [0.3,0.0]
+
+    Mask Options (If not specified will use a mask inclusive of all voxels):
+    --microbrain-mask - perform brain extraction using microbrain method (BET on MD map)
+    --explicit-mask=[mask.nii.gz] - use an explicit mask for processing
+    --bet-mask - perform brain extraction using FSL's BET
+    --bet-fval=[f-value] --bet-gval=[g-value], --- sets the bet2 mask parameters default [0.3,0.0]
+
+    Preprocessing Options:
     --gibbs - perform gibbs ringing correction (Kellner et al., 2016) using included third party c program
     --stabilize - perform stabilization using algorithm provided by non-local spatial angular matching algo (NLSAM, St Jean et al., 2016)
     --dnlsam - perform denoising using non-local spatial angular matching (NLSAM, St Jean et al., 2016)
     --dmppca - performs MPPCA denoising (Veraart et al., 2016) via DIPY
+    --dmppca-radius=[int] - radius of the patch for MPPCA denoising (default 2)
     --eddy --eddy_cuda - performs eddy current correction (Anderson et al., 2016) via FSL v6.0 or higher. CUDA mode runs faster if CUDA setup on NVIDIA GPU
 
+    Distortion Correction Options:
     --pe_direction=phase_encode_direction - direction of diffusion data in orig directory. phase_encode_direction can be LR for left/right or AP for anterior / posterior and their opposite pairs.  Required for distortion correction using a fieldmap or reverse phase encode data
     --AcqReadout= - Time between centre of first echo to centre of last echo as defined by FSL. Only required if using fieldmap spatial distortion correction
     --EffectiveEcho= - Time between centre of first echo to centre of last. Only required if using fieldmap spatial distortion correction
 
-    --no-N4 - does not perform N4 correction (Tustison el al., 2010) via ANTS, useful flag when data is prescan normalized (Siemens)
-    --no-json - if no .json image acquistion specification file available will run without this file
-    --mbrain-seg - perform surface based subcortical (Little et al., 2021, ISMRM) via MIRTK
+    Segmentation Options:
+    --mbrain-seg - perform surface based subcortical segmentation (Little et al., 2023, BioArxiv) via MIRTK
     --mbrain-cort - perform surface based cortex segmentation using DTI (Little et al., 2021, NeuroImage) via MIRTK
     --use-tensor-wm - when performing wm/cortex segmentation use the tensor-based force + dwi and stop (i.e. do not refine surface on mean DWI only).  Useful when GM/WM contrast on mean DWI is poor.  Not necessary in high quality data such as HCP diffusion acquisitions.
+
+    Other Options:
+    --no-N4 - does not perform N4 correction (Tustison el al., 2010) via ANTS, useful flag when data is prescan normalized (Siemens)
+    --no-json - if no .json image acquistion specification file available will run without this file
     --cpu-num - number of cpus to use for nlsam denoising and surface-based subcortical/cortical segmentation (MIRTK) if not set will use defaults for those programs
 
     Examples Different Distortion Correction Methods:
 
     1) No spatial distortion correction, b1000
-    python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory
-    python3 microbrain.py -s path_to_subject_directory -b [0,1000] --all
+    microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory
+    microbrain_run.py -s path_to_subject_directory -b [0,1000] --dmppca --gibbs --eddy
 
     2) Spatial Distortion Correction with reverse phase encode
-    python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_reversePE=path_to_dicom_directory_with_reverse_PE_data
-    python3 microbrain.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --all
+    microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_reversePE=path_to_dicom_directory_with_reverse_PE_data
+    microbrain_run.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --dmppca --gibbs --eddy
 
     3) Spatial Distortion Correction with siemens fieldmap data
-    python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_fieldmap=[path_to_dicom_directory_with_magnitude_data, path_to_dicom_directory_with_phase_data, 2.46]
-    python3 microbrain.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --AcqReadout=0.04999 --EffectiveEcho=0.00034 --all
+    microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_fieldmap=[path_to_dicom_directory_with_magnitude_data, path_to_dicom_directory_with_phase_data, 2.46]
+    microbrain_run.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --AcqReadout=0.04999 --EffectiveEcho=0.00034 --dmppca --gibbs --eddy
     """
 
     try:
         # Note some of these options were left for testing purposes
-        opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "bet-fval=", "bet-gval=", "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=", "rerun-mask",
-                                   "dmppca", "dmppca-radius=", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "all", "mbrain-seg", "mbrain-cort", "freesurf-dir=", "hcp", "cb", "allxeddy", "allxn4", "stabilize", "use-tensor-wm"])
+        opts, args = getopt.getopt(argv, "hs:b:i:", ["idcm=", "subdir=", "bvalues=", "bet-mask", "bet-fval=", "bet-gval=", "microbrain-mask", "explicit-mask=", "pe_direction=", "EffectiveEcho=", "AcqReadout=",
+                                   "dmppca", "dmppca-radius=", "dnlsam", "cpu-num=", "gibbs", "eddy", "eddy_cuda", "no-json", "no-N4", "mbrain-seg", "mbrain-cort", "stabilize", "use-tensor-wm"])
     except getopt.GetoptError:
         print(help_string)
         sys.exit(2)
@@ -141,7 +166,6 @@ def main(argv):
     for opt, arg in opts:
         if opt == '-h':
             print(help_string)
-
             sys.exit()
         elif opt in ("-s", "--subdir"):
             outputDir = os.path.normpath(arg)
@@ -159,8 +183,6 @@ def main(argv):
             bet_gval = float(arg)
         elif opt in ("--microbrain-mask"):
             microbrain_mask = True
-        elif opt in ("--no-mask"):
-            mask = False
         elif opt in ("--explicit-mask"):
             explicit_mask = os.path.normpath(arg)
         elif opt in ("--stabilize"):
@@ -175,11 +197,9 @@ def main(argv):
             gibbs = True
         elif opt in ("--eddy"):
             cuda = False
-            mask = True
             eddy = True
         elif opt in ("--eddy_cuda"):
             cuda = True
-            mask = True
             eddy = True
         elif opt in ("--pe_direction"):
             pe_direction_specified = True
@@ -201,8 +221,6 @@ def main(argv):
             cort_seg = True
         elif opt in ("--use-tensor-wm"):
             use_tensor_wm = True
-        elif opt in ("--freesurf-dir"):  # Not available currently
-            freesurfDir = os.path.normpath(arg)
 
     outputDir, subID = os.path.split(outputDir)
     print('Processing:' + subID)
