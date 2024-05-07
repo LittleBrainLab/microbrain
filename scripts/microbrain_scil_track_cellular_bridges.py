@@ -17,10 +17,33 @@ from glob import glob
 
 
 def is_tool(name):
+    """
+    Check whether `name` is on PATH and marked as executable.
+
+    Parameters
+    ----------
+    name : str
+        The name of the program to check.
+
+    Returns
+    -------
+    bool
+        `True` if `name` is executable, `False` otherwise.
+    """
+
     return which(name) is not None
 
 
 def fsl_ext():
+    """
+    Returns the FSL output type extension
+
+    Returns
+    -------
+    fsl_extension : str
+        The FSL output type extension
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -30,6 +53,44 @@ def fsl_ext():
 
 
 def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=10, sfthres_init=0.1, sfthres=0.15, min_length_tractogram=0, min_length=2, max_length=20, min_mesh_length=0.10, max_mesh_length=0.15):
+    """
+    Run cellular bridge tractography for a subject (Little 2024, in prep)
+
+    Parameters
+    ----------
+    subDir : str
+        The subject directory
+    subID : str
+        The subject ID
+    outDir : str
+        The output directory
+
+    Optional Parameters
+    ----------
+    algo : str
+        The tracking algorithm prob or det (default: prob)
+    nbr_seeds : int
+        The number of seeds per vertex (default: 10)
+    sfthres_init : float
+        The initial fODF threshold for streamline tractography (default: 0.1)
+    sfthres : float
+        The fODF threshold for streamline tractography (default: 0.15)
+    min_length_tractogram : int
+        The minimum length of a streamline when generating tractogram(default: 0)
+    min_length : int
+        The minimum length of the streamline when filtering for CLGBs (default: 2)
+    max_length : int
+        The maximum length of the streamline when filtering for CLGBs (default: 20)
+    min_mesh_length : float
+        The minimum edge length of the mesh (default: 0.10)
+    max_mesh_length : float
+        The maximum edge length of the mesh (default: 0.15)
+
+    Returns
+    -------
+    none
+    """
+
 
     mask_dir = outDir + '/tracking_mask'
     if not os.path.exists(mask_dir):
@@ -307,7 +368,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
 def main(argv):
 
     help_string = """usage: microbrain_export_wm_tracking_mask.py -s <subject_directory> -o <output_directory>
-    description: microbrain_scil_whole_brain_tractography.py outputs
+    description: Reconstructs caudalentricular gray matter bridges using mesh-based custom seeding and filtering tractography using methods from Little et al. 2024 (in prep)
 
     mandatory arguments:
     -s, --subDir <subject directory> - microbrain subject output directory
