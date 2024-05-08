@@ -84,7 +84,6 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
     none
     """
 
-
     mask_dir = outDir + '/tracking_mask'
     if not os.path.exists(mask_dir):
         os.makedirs(mask_dir)
@@ -101,39 +100,52 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
         os.system('fslmaths ' + fmask_tracking_float +
                   ' ' + fmask_tracking + ' -odt int')
 
-    # Generate fiber response function
-    # Note these definitions only work for HCP data right now
-    fdwi = subDir + '/orig/' + subID + '.nii.gz'
-    fbval = subDir + '/orig/' + subID + '.bval'
-    fbvec = subDir + '/orig/' + subID + '.bvec'
+    # Get preprocessing suffix from mean b0
+    mean_b0 = glob(subDir + '/meanDWI/' + subID + '*_mean_b0.nii.gz')[0]
+    preproc_suffix = mean_b0.split(subID)[-1].replace('_mean_b0.nii.gz', '')[1:]
+
+    if preproc_suffix == '':
+        fdwi = subDir + '/orig/' + subID + '.nii.gz'
+        fbval = subDir + '/orig/' + subID + '.bval'
+        fbvec = subDir + '/orig/' + subID + '.bvec'
+    else:
+        # if preproc_suffix contains 'EDDY' then use rotated bvecs
+        if 'EDDY' in preproc_suffix:
+            fbvec = subDir + '/preprocessed/' + subID + '_' + \
+                preproc_suffix + '.nii.gz.eddy_rotated_bvecs'
+        else:
+            fbvec = subDir + '/orig/' + subID + '.bvec'
+        fbval = subDir + '/orig/' + subID + '.bval'
+        fdwi = subDir + '/preprocessed/' + subID + '_' + preproc_suffix + '.nii.gz'
 
     fodf_dir = outDir + '/fodf'
     if not os.path.exists(fodf_dir):
-        os.makedirs(fodf_dir)
+         os.makedirs(fodf_dir)
 
+    # Generate fiber response function
     fresponse = fodf_dir + '/' + subID + '_frf.txt'
     if not os.path.exists(fresponse):
         print('Generating fiber response function')
-        os.system('scil_compute_ssst_frf.py ' + fdwi + ' ' + fbval +
-                  ' ' + fbvec + ' ' + fresponse + ' --mask ' + fmask_tracking)
+        os.system('scil_frf_ssst.py ' + fdwi + ' ' + fbval +
+                  ' ' + fbvec + ' ' + fresponse + ' --mask_wm ' + fmask_tracking)
 
     # convert brain mask to int
     fmask_brain_float = glob(subDir + '/orig/' + subID + '*_mask.nii.gz')[0]
     fmask_brain = fmask_brain_float.replace('_mask.nii.gz', '_mask_int.nii.gz')
     if not os.path.exists(fmask_brain):
-        os.system('fslmaths ' + fmask_brain_float +
-                  ' ' + fmask_brain + ' -odt int')
+         os.system('fslmaths ' + fmask_brain_float +
+                   ' ' + fmask_brain + ' -odt int')
 
     ffodf = fodf_dir + '/' + subID + '_fodf.nii.gz'
     if not os.path.exists(ffodf):
-        print('Generating fodf')
-        os.system('scil_compute_ssst_fodf.py ' + fdwi + ' ' + fbval + ' ' +
-                  fbvec + ' ' + fresponse + ' ' + ffodf + ' --mask ' + fmask_brain)
+         print('Generating fodf')
+         os.system('scil_fodf_ssst.py ' + fdwi + ' ' + fbval + ' ' +
+                   fbvec + ' ' + fresponse + ' ' + ffodf + ' --mask ' + fmask_brain)
 
     # Generate seed based tractography
     tracking_dir = outDir + '/gm_cellular_bridge_tractography'
     if not os.path.exists(tracking_dir):
-        os.makedirs(tracking_dir)
+         os.makedirs(tracking_dir)
 
     mesh_dir = tracking_dir + '/subcortical_segmentation_ply'
     if not os.path.exists(mesh_dir):
@@ -154,7 +166,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
 
     metric_dir = tracking_dir + '/metric_maps'
     if not os.path.exists(metric_dir):
-        os.makedirs(metric_dir)
+         os.makedirs(metric_dir)
 
     ic_roi_dir = tracking_dir + '/ic_roi'
     if not os.path.exists(ic_roi_dir):
@@ -205,7 +217,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
         ic_roi_dilated = ic_roi.replace('.nii.gz', '_dilated.nii.gz')
         if not os.path.exists(ic_roi_dilated):
             os.system('fslmaths ' + ic_roi +
-                      ' -kernel sphere 2 -dilM ' + ic_roi_dilated)
+                      ' -kernel sphere 3 -dilM ' + ic_roi_dilated)
 
         for struct in ['STRIATUM', 'GLOBUS']:
             StructVTK = subDir + '/subcortical_segmentation/mesh_output/' + \
@@ -213,7 +225,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
 
             StructPLY = mesh_dir + '/' + subID + '_refined_' + hemi + '_' + struct + '.ply'
             if not os.path.exists(StructPLY):
-                os.system('scil_convert_surface.py ' +
+                os.system('scil_surface_convert.py ' +
                           StructVTK + ' ' + StructPLY)
 
             StructPLY_remesh = StructPLY.replace('.ply', '_remesh.ply')
@@ -242,9 +254,6 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
                 os.system('scil_compute_mesh_based_local_tracking.py ' + ffodf + ' ' + inCoords_remesh + ' ' +
                           fmask_tracking + ' ' + out_tractogram_remesh + ' --in_norm_list ' + inNorms_remesh +
                           ' --save_seeds --min_length ' + str(min_length_tractogram) + ' --sfthres_init ' + str(sfthres_init) + ' --sfthres ' + str(sfthres) + ' --algo ' + str(algo) + ' --nbr_sps ' + str(nbr_seeds) + ' -v')
-                # os.system('scil_compute_mesh_based_local_tracking.py ' + ffodf + ' ' + inCoords_remesh + ' ' +
-                #        fmask_tracking + ' ' + out_tractogram_remesh  +
-                #       ' --save_seeds --min_length ' + str(min_length_tractogram) + ' --sfthres_init ' + str(sfthres_init) + ' --sfthres ' + str(sfthres) + ' --algo ' + str(algo) + ' --nbr_sps ' + str(nbr_seeds) + ' -v ')
 
     # Filter tractograms to create a single cellular bridge tractogram per hemisphere
     streamline_file_list = []
@@ -266,16 +275,16 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
 
         # STRIATUM orientation
         out_tractogram_STRIATUM_STRIATUM_orientation = out_tractogram_STRIATUM_STRIATUM.replace(
-            '.trk', '_orientationMaxY6.trk')
+           '.trk', '_orientationMaxY6.trk')
         if not os.path.exists(out_tractogram_STRIATUM_STRIATUM_orientation):
-            os.system('scil_filter_streamlines_by_orientation.py ' + out_tractogram_STRIATUM_STRIATUM +
+            os.system('scil_tractogram_filter_by_orientation.py ' + out_tractogram_STRIATUM_STRIATUM +
                       ' ' + out_tractogram_STRIATUM_STRIATUM_orientation + ' --max_y 6 ')
 
         # STRIATUM length
         out_tractogram_STRIATUM_STRIATUM_orientation_length = tractogram_gm_cellular_bridge_dir + \
             '/' + subID + '_refined_' + hemi + '_gm_celluar_bridge_tractogram.trk'
         if not os.path.exists(out_tractogram_STRIATUM_STRIATUM_orientation_length):
-            os.system('scil_filter_streamlines_by_length.py ' + out_tractogram_STRIATUM_STRIATUM_orientation + ' ' +
+            os.system('scil_tractogram_filter_by_length.py ' + out_tractogram_STRIATUM_STRIATUM_orientation + ' ' +
                       out_tractogram_STRIATUM_STRIATUM_orientation_length + ' --maxL ' + str(max_length) + ' --minL ' + str(min_length))
         streamline_file_list.append(
             out_tractogram_STRIATUM_STRIATUM_orientation_length)
@@ -286,43 +295,43 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
         out_streamline_density = metric_dir + '/' + \
             streamline_file_name.replace('.trk', '_density.nii.gz')
         if not os.path.exists(out_streamline_density):
-            os.system('scil_compute_streamlines_density_map.py ' +
+            os.system('scil_tractogram_compute_density_map.py ' +
                       streamline_file + ' ' + out_streamline_density)
 
         out_streamline_density_norm = metric_dir + '/' + \
             streamline_file_name.replace('.trk', '_density_norm.nii.gz')
         if not os.path.exists(out_streamline_density_norm):
-            os.system('scil_image_math.py normalize_max ' + out_streamline_density +
+            os.system('scil_volume_math.py normalize_max ' + out_streamline_density +
                       ' ' + out_streamline_density_norm + ' --data float32')
 
         out_streamline_density_mask = metric_dir + '/' + \
             streamline_file_name.replace('.trk', '_density_mask.nii.gz')
         if not os.path.exists(out_streamline_density_mask):
-            os.system('scil_image_math.py ceil ' + out_streamline_density_norm +
+            os.system('scil_volume_math.py ceil ' + out_streamline_density_norm +
                       ' ' + out_streamline_density_mask + ' --data uint8')
 
         out_afd_map = metric_dir + '/' + \
             streamline_file_name.replace('.trk', '_afd.nii.gz')
         if not os.path.exists(out_afd_map):
-            os.system('scil_compute_mean_fixel_afd_from_bundles.py ' +
+            os.system('scil_bundle_mean_fixel_afd.py ' +
                       streamline_file + ' ' + ffodf + ' ' + out_afd_map)
 
         out_bingham_map = metric_dir + '/' + \
             streamline_file_name.replace('.trk', '_bingham.nii.gz')
         if not os.path.exists(out_bingham_map):
-            os.system('scil_fit_bingham_to_fodf.py ' + ffodf + ' ' +
+            os.system('scil_fodf_to_bingham.py ' + ffodf + ' ' +
                       out_bingham_map + ' --mask ' + out_streamline_density_mask)
 
         out_fd_map = metric_dir + '/' + \
             streamline_file_name.replace('.trk', '_fd.nii.gz')
         if not os.path.exists(out_fd_map):
-            os.system('scil_compute_lobe_specific_fodf_metrics.py ' + out_bingham_map +
+            os.system('scil_bingham_metrics.py ' + out_bingham_map +
                       ' --out_fd ' + out_fd_map + ' --mask ' + out_streamline_density_mask + ' --not_all')
 
         out_fd_fixel_map = metric_dir + '/' + \
             streamline_file_name.replace('.trk', '_fd_fixel.nii.gz')
         if not os.path.exists(out_fd_fixel_map):
-            os.system('scil_compute_mean_fixel_lobe_metric_from_bundles.py ' + streamline_file +
+            os.system('scil_bundle_mean_fixel_bingham_metric.py ' + streamline_file +
                       ' ' + out_bingham_map + ' ' + out_fd_map + ' ' + out_fd_fixel_map)
 
         out_metric_file = metric_dir + '/' + \
