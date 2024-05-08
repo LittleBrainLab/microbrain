@@ -78,7 +78,7 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
     # LH WM to mask
     flh_wmsurf = glob.glob(
         surfDir + '/mesh_segmentation/' + subID + '*_wm_final_lh.vtk')[0]
-    print(flh_wmsurf)
+   
     flh_out = flh_wmsurf.replace('.vtk', '_mask.nii.gz')
     sutil.surf_to_volume_mask(fdwi, flh_wmsurf, 1, flh_out)
 
