@@ -243,7 +243,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
             StructPLY_remesh_reorient = mesh_dir + '/' + subID + \
                 '_refined_' + hemi + '_' + struct + '_remesh_reorient.ply'
             if not os.path.exists(inCoords_remesh):
-                os.system('scil_convert_mesh_to_coords_norms.py ' + StructPLY_remesh + ' ' + inCoords_remesh + ' ' + inNorms_remesh + ' --apply_transform ' +
+                os.system('scil_surface_convert_to_coordinates.py ' + StructPLY_remesh + ' ' + inCoords_remesh + ' ' + inNorms_remesh + ' --apply_transform ' +
                           fmask_brain + ' --ras --output_mesh ' + StructPLY_remesh_reorient + ' --within_mask ' + ic_roi_dilated + ' --output_trk ' + seeds_trk)
 
             # Generate tractogram for structure
@@ -251,7 +251,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
                 '_refined_' + hemi + '_' + struct + '_tractogram.trk'
             if not os.path.exists(out_tractogram_remesh) and struct != 'GLOBUS':
                 print('sfthres: ' + str(sfthres))
-                os.system('scil_compute_mesh_based_local_tracking.py ' + ffodf + ' ' + inCoords_remesh + ' ' +
+                os.system('scil_tracking_based_on_surface.py ' + ffodf + ' ' + inCoords_remesh + ' ' +
                           fmask_tracking + ' ' + out_tractogram_remesh + ' --in_norm_list ' + inNorms_remesh +
                           ' --save_seeds --min_length ' + str(min_length_tractogram) + ' --sfthres_init ' + str(sfthres_init) + ' --sfthres ' + str(sfthres) + ' --algo ' + str(algo) + ' --nbr_sps ' + str(nbr_seeds) + ' -v')
 
@@ -270,7 +270,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
         out_tractogram_STRIATUM_STRIATUM = tractogram_gm_cellular_bridge_dir + '/' + \
             subID + '_refined_' + hemi + '_STRIATUM_tractogram_filter_STRIATUM_Both_Ends.trk'
         if not os.path.exists(out_tractogram_STRIATUM_STRIATUM):
-            os.system('scil_filter_tractogram_based_on_mesh.py ' + in_tractogram_STRIATUM + ' ' +
+            os.system('scil_tractogram_filter_by_surface.py ' + in_tractogram_STRIATUM + ' ' +
                       out_tractogram_STRIATUM_STRIATUM + ' --mesh_roi ' + in_mesh_STRIATUM + ' both_ends include --dist_thr 0.1')
 
         # STRIATUM orientation
