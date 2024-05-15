@@ -12,16 +12,27 @@ from scipy import ndimage
 from os import system, environ, path
 
 import os
+import inspect
 import vtk
 from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
-
-import matplotlib.pyplot as plt
 
 from os import system
 import subprocess
 
 
 def fsl_ext():
+    """
+    Gets the preferred image extension used by FSL
+
+    Parameters
+    ----------
+    none
+
+    Returns
+    -------
+    extension: a string containing the preferred output
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -30,7 +41,43 @@ def fsl_ext():
     return fsl_extension
 
 
+def get_tissue_dir():
+    """
+    Return tissue directory in microbrain repository
+
+    Returns
+    -------
+    tissue_dir: string
+        tissue path
+    """
+
+    import microbrain  # ToDo. Is this the only way?
+    module_path = inspect.getfile(microbrain)
+
+    tissue_dir = os.path.dirname(module_path) + "/data/tissuepriors/"
+
+    return tissue_dir
+
 def vtktogii(vtk_fname, giiT, giiT2, C):
+    """
+    Convert vtk file to gii file
+
+    Parameters
+    ----------
+    vtk_fname: string
+        filename of vtk file
+    giiT: string
+        surface type 1
+    giiT2: string
+        surface type 2
+    C: string
+        cortex type
+
+    Returns
+    -------
+    gii_fname: string
+        filename of output gii file
+    """
     gii_fname = vtk_fname.replace('.vtk', '.surf.gii')
     tempgii_fname = gii_fname.replace('.surf.gii', '.temp.surf.gii')
     os.system('mirtk convert-pointset ' + vtk_fname +
@@ -43,6 +90,29 @@ def vtktogii(vtk_fname, giiT, giiT2, C):
 
 
 def giimap(vtk_fname, gii_fname, scalars, mapname, C, flip=True):
+    """
+    Map scalar data from vtk file to gii file
+
+    Parameters
+    ----------
+    vtk_fname: string
+        filename of vtk file
+    gii_fname: string
+        filename of gii file
+    scalars: string
+        name of scalar data in vtk
+    mapname: string
+        name of scalar data in output gii
+    C: string
+        cortex type
+    flip: boolean
+        flip the scalar data
+
+    Returns
+    -------
+    none
+    """
+
     tempvtk = vtk_fname.replace('.vtk', '_temp.vtk')
     filename, extension = os.path.splitext(gii_fname)
     giiType, filename = os.path.splitext(filename)
@@ -75,6 +145,24 @@ def giimap(vtk_fname, gii_fname, scalars, mapname, C, flip=True):
 
 
 def freesurf_fix_topology(wm_surf_fname, C, freesurf_subdir):
+    """
+    Use freesurfer tools to fix topology of white matter surface
+
+    Parameters
+    ----------
+    wm_surf_fname: string
+        filename of white matter surface
+    C: string
+        cortex hemisphere
+    freesurf_subdir: string
+        freesurfer subject directory
+
+    Returns
+    -------
+    wm_orig_fix_fname: string
+        filename of fixed white matter surface
+    """
+
     if C == 'CORTEX_LEFT':
         hemi = 'lh'
     else:
@@ -118,6 +206,29 @@ def freesurf_fix_topology(wm_surf_fname, C, freesurf_subdir):
 
 
 def freesurfer_mris_sphere(wm_gii, wm_inflate2_gii, wm_sphere_gii, hemi, C, freesurf_subdir):
+    """
+    Use freesurfer tools to map white matter surface to sphere
+
+    Parameters
+    ----------
+    wm_gii: string
+        filename of white matter surface
+    wm_inflate2_gii: string
+        filename of inflated white matter surface
+    wm_sphere_gii: string
+        filename of sphere white matter surface
+    hemi: string
+        hemisphere
+    C: string
+        cortex hemisphere
+    freesurf_subdir: string
+        freesurfer subject directory
+
+    Returns
+    -------
+    none
+    """
+
     fs_wm = freesurf_subdir + 'surf/' + hemi + '.white'
     fs_smoothwm = freesurf_subdir + 'surf/' + hemi + '.smoothwm'
     fs_inflate = freesurf_subdir + 'surf/' + hemi + '.inflated'
@@ -144,6 +255,25 @@ def freesurfer_mris_sphere(wm_gii, wm_inflate2_gii, wm_sphere_gii, hemi, C, free
 
 
 def freesurf_mris_inflate(wm_gii, wm_inflate_gii, wm_sulc_gii, C):
+    """
+    Use freesurfer tools to inflate white matter surface
+
+    Parameters
+    ----------
+    wm_gii: string
+        filename of white matter surface
+    wm_inflate_gii: string
+        filename of inflated white matter surface
+    wm_sulc_gii: string
+        filename of sulc white matter surface
+    C: string
+        cortex hemisphere
+
+    Returns
+    -------
+    none
+    """
+
     os.system('mris_inflate -n 20 -sulc tmpsulc ' +
               wm_gii + ' ' + wm_inflate_gii)
     os.system('wb_command -set-structure ' + wm_inflate_gii + ' ' +
@@ -156,11 +286,30 @@ def freesurf_mris_inflate(wm_gii, wm_inflate_gii, wm_sulc_gii, C):
 
 
 def msm_reg(wm_sphere_gii, ref_sphere_gii, wm_sulc_gii, ref_sulc_gii, hemi, conf_file, trans_reg=None):
-    # Do I need this???
-    # print("Rescaling Sphere for Registration")
-    # wm_sphere_rescaled_gii = wm_sphere_gii.replace('.surf.gii','-rescaled.surf.gii')
-    # os.system('wb_command -surface-modify-sphere ' + wm_sphere_gii + ' 100 ' + wm_sphere_rescaled_gii + ' -recenter')
+    """
+    Register white matter surface to reference sphere
 
+    Parameters
+    ----------
+    wm_sphere_gii: string
+        filename of white matter sphere surface
+    ref_sphere_gii: string
+        filename of reference sphere surface
+    wm_sulc_gii: string
+        filename of white matter sulc surface
+    ref_sulc_gii: string
+        filename of reference sulc surface
+    hemi: string
+        hemisphere
+    conf_file: string
+        MSM configuration file
+    trans_reg: string
+        filename of initial linear transformation to be applied prior to nonlinear registration
+
+    Returns
+    -------
+    none
+    """
     print("Registering Sphere")
     # HCP configuration files
     msmConfDir = '/home/graham/Software/NeuroSoftware/HCPpipelines-master/MSMConfig/'
@@ -183,19 +332,26 @@ def register_probmap_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
 
     Parameters
     ----------
-    fsource: image in native space
-    ftemplate: image template in MNI space (or normal space)
-    fatlas: 4D nifti file in MNI space to be registered
-    regDir: Directory to store outpu
+    fsource: string
+        filename of image in native space
+    ftemplate: string
+        filename of image template in MNI space (or normal space)
+    fatlas: string
+        4D nifti file in MNI space to be registered
+    regDir: string
+        directory to save registration files
 
     Optional Parameters
     -------------------
-    cpu_num: integer defining the number of cpu threads to use for registration
+    cpu_num: int
+        integer defining the number of cpu threads to use for registration
 
     Returns
     -------
-    fatlas_out: filename for atlas registered to native space
+    fatlas_out: string
+        filename for atlas registered to native space
     """
+
     if not path.exists(regDir):
         system('mkdir ' + regDir)
 
@@ -244,6 +400,42 @@ def register_probmap_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
 
 
 def multi_channel_tissue_classifier(ffa, fdwi, fmask, fgm_native, fwm_native, fcsf_native, segDir, tissue_prob_suffix, PriorWeight=0.1):
+    """
+    Run Atropos for multi-channel tissue classification
+
+    Parameters
+    ----------
+    ffa: string
+        filename of FA map
+    fdwi: string
+        filename of mean DWI
+    fmask: string
+        filename of brain mask
+    fgm_native: string
+        filename of GM probability map in native space
+    fwm_native: string
+        filename of WM probability map in native space
+    fcsf_native: string
+        filename of CSF probability map in native space
+    segDir: string
+        directory to save segmentation files
+    tissue_prob_suffix: string
+        suffix for tissue probability maps
+    PriorWeight: float
+        weight for prior probability
+
+    Returns
+    -------
+    fseg_out: string
+        filename of tissue segmentation
+    fgm_prob_out: string
+        filename of GM probability map
+    fwm_prob_out: string
+        filename of WM probability map
+    fcsf_prob_out: string
+        filename of CSF probability map
+    """
+
     tissue_nclasses = 3
 
     print("Starting Tissue Segmentation")
@@ -292,6 +484,55 @@ def multi_channel_tissue_classifier(ffa, fdwi, fmask, fgm_native, fwm_native, fc
 
 
 def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcortex_dist, fdwi_resamp, fdwi_neg, ftb_force, fmask, voxelDir, tissueDir, subDir, thisSub, suffix, preproc_suffix, surfDir, cpu_num=0):
+    """
+    Generate initial white matter surface
+
+    Parameters
+    ----------
+    fwm_lh: string
+        filename of left hemisphere white matter
+    fwm_rh: string
+        filename of right hemisphere white matter
+    finter: string
+        filename of interface mask
+    finter_hippo: string
+        filename of interface mask with hippocampus
+    fwm_dist: string
+        filename of white matter distance map
+    fcortex_dist: string
+        filename of cortex distance map
+    fdwi_resamp: string
+        filename of resampled mean DWI
+    fdwi_neg: string
+        filename of mean DWI with negative values
+    ftb_force: string
+        filename of tensor-based force map
+    fmask: string
+        filename of brain mask
+    voxelDir: string
+        directory to save voxel files
+    tissueDir: string
+        directory to save tissue files
+    subDir: string
+        directory to save subject files
+    thisSub: string
+        microbrain subject ID
+    suffix: string
+        suffix for bvalue shells used
+    preproc_suffix: string
+        suffix for preprocessing performed
+    surfDir: string
+        directory to save surface files
+
+    Optional Parameters
+    -------------------
+    cpu_num: int
+        integer defining the number of cpu threads to use for steps where applicable
+
+    Returns
+    -------
+    none
+    """
 
     # Register GM, WM, CSF probability map to native space
     regDir = subDir + 'registration/'
@@ -301,12 +542,9 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
 
     ftemplate = os.environ['FSLDIR'] + \
         '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
-    fgm = root_dir + \
-        '/Data/tissuepriors/avg152T1_gm_resampled.nii'
-    fwm = root_dir + \
-        '/Data/tissuepriors/avg152T1_wm_resampled.nii'
-    fcsf = root_dir + \
-        '/Data/tissuepriors/avg152T1_csf_resampled.nii'
+    fgm = get_tissue_dir() + 'avg152T1_gm_resampled.nii.gz'
+    fwm = get_tissue_dir() + 'avg152T1_wm_resampled.nii.gz'
+    fcsf = get_tissue_dir() + 'avg152T1_csf_resampled.nii.gz'
 
     ffa = subDir + 'DTI_maps/' + thisSub + suffix + '_FA' + fsl_ext()
 
@@ -632,28 +870,6 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
 
     nib.save(nib.Nifti1Image(cortex_dist, new_affine), fcortex_dist)
 
-    # #output CSF seg
-    # fcsf_mask = surfDir + thisSub + suffix + '_csf_mask' + fsl_ext()
-    # csf_mask = np.zeros(seg_data.shape)
-    # csf_mask[seg_data == 1] = 1
-    # csf_mask[seg_data == 2] = 1
-    # nib.save(nib.Nifti1Image(csf_mask, new_affine), fcsf_mask)
-
-    # #convert to distant image (mirtk)
-    # fcortex_dist_mirtk = surfDir + thisSub + suffix + '_cortex_csf_dist_mirtk' + fsl_ext()
-    # os.system('mirtk calculate-distance-map ' + fcsf_mask + ' ' + fcortex_dist_mirtk)
-
-    # # Load distance image and fill internal and external structures
-    # cortex_dist = nib.load(fcortex_dist_mirtk).get_fdata()
-    # cortex_dist[binary_dilation(binary_dilation(internal_mask == 1))] = -2
-    # cortex_dist[binary_dilation(binary_dilation(ventricles))] = -2
-    # cortex_dist[binary_dilation(binary_dilation(brain_stem))] = 2
-    # cortex_dist[cerebellar_gm] = 2
-    # cortex_dist[cerebellar_wm] = 2
-    # cortex_dist[external_mask == 1] = 2
-
-    # nib.save(nib.Nifti1Image(cortex_dist, new_affine), fcortex_dist)
-
     # Estimate boundary FA
     fwm_edge = fpseudo_white.replace(fsl_ext(), '_edge' + fsl_ext())
     os.system('fslmaths ' + fpseudo_white + ' -edge -bin -mas ' +
@@ -682,6 +898,33 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
 
 
 def generate_initial_wm_surface(surfDir, freesurf_subdir, thisSub, suffix, wm_lh_fname, wm_rh_fname, wm_surf_fname, finter):
+    """
+    Generate initial white matter surface
+
+    Parameters
+    ----------
+    surfDir: string
+        directory to save surface files
+    freesurf_subdir: string
+        directory to save freesurfer files
+    thisSub: string
+        microbrain subject ID
+    suffix: string
+        suffix for bvalue shells used
+    wm_lh_fname: string
+        filename of left hemisphere white matter mask
+    wm_rh_fname: string
+        filename of right hemisphere white matter mask
+    wm_surf_fname: string
+        filename of initial white matter surface
+    finter: string
+        filename of output interface mask
+
+    Returns
+    -------
+    none
+    """
+
     wm_lh_surf_fname = surfDir + thisSub + suffix + '_wm_lh.vtk'
     os.system('mirtk extract-surface ' + wm_lh_fname +
               ' ' + wm_lh_surf_fname + ' -isovalue 0.5')
@@ -798,6 +1041,27 @@ def generate_initial_wm_surface(surfDir, freesurf_subdir, thisSub, suffix, wm_lh
 
 
 def deform_initial_wm_surface_with_tissue_probabilities(wm_surf_fname, wm_surf_dist_fname, fwm_dist, finter_hippo, cpu_str):
+    """
+    Deform initial white matter surface with tissue probabilities
+
+    Parameters
+    ----------
+    wm_surf_fname: string
+        filename of initial white matter surface
+    wm_surf_dist_fname: string
+        filename of output white matter surface
+    fwm_dist: string
+        filename of white matter distance map
+    finter_hippo: string
+        filename of output hippocampus/amygdala mask
+    cpu_str: string
+        string defining the number of cpu threads to use for steps where applicable
+
+    Returns
+    -------
+    none
+    """
+
     os.system('mirtk deform-mesh ' + wm_surf_fname + ' ' + wm_surf_dist_fname + ' -distance-image ' + fwm_dist + ' -distance 1.0 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
 
     # Add hippocampus/amygdala region to mask (no deformation of hippo/amygdala region from here on)
@@ -828,6 +1092,27 @@ def deform_initial_wm_surface_with_tissue_probabilities(wm_surf_fname, wm_surf_d
 
 
 def deform_wm_surface_with_tbforce(wm_surf_dist_fname, wm_tensor_fname, fdwi_resamp, ftb_force, cpu_str):
+    """
+    Deform white matter surface with tensor based force
+
+    Parameters
+    ----------
+    wm_surf_dist_fname: string
+        filename of input white matter surface
+    wm_tensor_fname: string
+        filename of output white matter surface
+    fdwi_resamp: string
+        filename of resampled mean DWI image
+    ftb_force: string
+        filename of tensor based force map
+    cpu_str: string
+        string defining the number of cpu threads to use for deformation
+
+    Returns
+    -------
+    none
+    """
+
     os.system('mirtk deform-mesh ' + wm_surf_dist_fname + ' ' + wm_tensor_fname + ' -image ' + fdwi_resamp + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 4 2 1 -distance-image ' + ftb_force +
               ' -distance 1.0 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
 
@@ -835,34 +1120,126 @@ def deform_wm_surface_with_tbforce(wm_surf_dist_fname, wm_tensor_fname, fdwi_res
 
 
 def deform_wm_surface_with_meanDWI(wm_tensor_fname, wm_final_fname, fdwi_resamp, cpu_str):
+    """
+    Deform white matter surface with mean DWI image
+
+    Parameters
+    ----------
+    wm_tensor_fname: string
+        filename of input white matter surface
+    wm_final_fname: string
+        filename of output white matter surface
+    fdwi_resamp: string
+        filename of resampled mean DWI image
+    cpu_str: string
+        string defining the number of cpu threads to use for deformation
+
+    Returns
+    -------
+    none
+    """
+
     os.system('mirtk deform-mesh ' + wm_tensor_fname + ' ' + wm_final_fname + ' -image ' + fdwi_resamp + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 1% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 4 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -gauss-curvature 1.0 -gauss-curvature-minimum .1 -gauss-curvature-maximum .2 -gauss-curvature-outside 0.5 -edge-distance-type ClosestMaximum -remesh 1 -min-edge-length 0.5 -max-edge-length 1.0' + cpu_str)
 
     return
 
 
 def deform_cortex_surface_with_tissue_probabilities(wm_final_fname, wm_expand_fname, fcortex_dist, cpu_str):
+    """
+    Deform cortex surface with tissue probabilities
+
+    Parameters
+    ----------
+    wm_final_fname: string
+        filename of input white matter surface
+    wm_expand_fname: string
+        filename of output cortex surface
+    fcortex_dist: string
+        filename of cortex distance map
+    cpu_str: string
+        string defining the number of cpu threads to use for deformation
+
+    Returns
+    -------
+    none
+    """
+
     os.system('mirtk deform-mesh ' + wm_final_fname + ' ' + wm_expand_fname + ' -distance-image ' + fcortex_dist + ' -distance 0.5 -distance-smoothing 1 -distance-averaging 4 2 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 100 200 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate' + cpu_str)
 
     return
 
 
 def deform_cortex_surface_with_meanDWI(wm_expand_fname, pial_fname, fcortex_dist, fdwi_neg, cpu_str):
+    """
+    Deform cortex surface with mean DWI image
+
+    Parameters
+    ----------
+    wm_expand_fname: string
+        filename of input cortex surface
+    pial_fname: string
+        filename of output cortex surface
+    fcortex_dist: string
+        filename of cortex distance map
+    fdwi_neg: string
+        filename of negative mean DWI image
+    cpu_str: string
+        string defining the number of cpu threads to use for deformation
+
+    Returns
+    -------
+    none
+    """
+
     os.system('mirtk deform-mesh ' + wm_expand_fname + ' ' + pial_fname + ' -image ' + fdwi_neg + ' -edge-distance 1.0 -edge-distance-smoothing 1 -edge-distance-median 1 -edge-distance-averaging 1 -distance-image ' + fcortex_dist +
               ' -distance 0.35 -distance-smoothing 1 -distance-averaging 1 -distance-measure normal -optimizer EulerMethod -step 0.2 -steps 300 -epsilon 1e-6 -delta 0.001 -min-active 5% -reset-status -nointersection -fast-collision-test -min-width 0.1 -min-distance 0.1 -repulsion 2.0 -repulsion-distance 0.5 -repulsion-width 1.0 -curvature 4.0 -edge-distance-type ClosestMaximum -edge-distance-max-intensity -1 -gauss-curvature 1.6 -gauss-curvature-minimum .1 -gauss-curvature-maximum .4 -gauss-curvature-inside 2 -negative-gauss-curvature-action inflate' + cpu_str)
 
     return
 
 
-def split_surface(wm_final_fname, lh_wm_fname, rh_wm_fname):
-    wm_surf = sutil.read_surf_vtk(wm_final_fname)
-    [lh_wm, rh_wm] = sutil.split_surface_by_label(wm_surf)
-    sutil.write_surf_vtk(lh_wm, lh_wm_fname)
-    sutil.write_surf_vtk(rh_wm, rh_wm_fname)
+def split_surface(surf_fname, lh_surf_fname, rh_surf_fname):
+    """
+    Split surface into left and right hemispheres
+
+    Parameters
+    ----------
+    surf_fname: string
+        filename of input surface
+    lh_surf_fname: string
+        filename of output left hemisphere surface
+    rh_surf_fname: string
+        filename of output right hemisphere surface
+
+    Returns
+    -------
+    none
+    """
+    surf = sutil.read_surf_vtk(surf_fname)
+    [lh_surf, rh_surf] = sutil.split_surface_by_label(surf)
+    sutil.write_surf_vtk(lh_surf, lh_surf_fname)
+    sutil.write_surf_vtk(rh_surf, rh_surf_fname)
 
     return
 
 
 def generate_midthickness(finner_surf, fouter_surf, fmedial):
+    """
+    Generate mid-surface
+
+    Parameters
+    ----------
+    finner_surf: string
+        filename of inner surface
+    fouter_surf: string
+        filename of outer surface
+    fmedial: string
+        filename of output mid-surface
+
+    Returns
+    -------
+    none
+    """
+
     inner_surf = sutil.read_surf_vtk(finner_surf)
     outer_surf = sutil.read_surf_vtk(fouter_surf)
 
@@ -874,6 +1251,35 @@ def generate_midthickness(finner_surf, fouter_surf, fmedial):
 
 
 def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix, shell_suffix, freesurf_subdir, cpu_num=0, use_tensor_wm=False):
+    """
+    Generate cortical surfaces from DWI data
+
+    Parameters
+    ----------
+    fmask: string
+        filename of brain mask
+    voxelDir: string
+        directory containing voxel-wise data
+    outDir: string
+        output directory
+    thisSub: string
+        microbrain subject ID
+    preproc_suffix: string
+        suffix for preprocessed data
+    shell_suffix: string
+        suffix for bvalue shells used
+    freesurf_subdir: string
+        directory to save freesurfer files
+    cpu_num: int
+        number of cpu threads to use for deformation
+    use_tensor_wm: bool
+        flag to use tensor based force for white matter surface deformation
+
+    Returns
+    -------
+    none
+    """
+
     print("Surfing: " + thisSub)
     subDir = outDir + '/' + thisSub + '/'
     surfDir = subDir + 'surf/'
@@ -1020,121 +1426,5 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
                           'MIDTHICKNESS', 'CORTEX_LEFT')
     rh_mid_gii = vtktogii(rh_mid_fname, 'ANATOMICAL',
                           'MIDTHICKNESS', 'CORTEX_RIGHT')
-
-    return
-
-    # for hemi in ['lh','rh']:
-    #     if hemi == 'lh':
-    #         hemi_letter = 'L'
-    #         C = 'CORTEX_LEFT'
-    #         wm_vtk = lh_wm_fname
-    #         pial_vtk = lh_pial_fname
-    #         wm_gii = lh_wm_gii
-    #         pial_gii = lh_pial_gii
-    #     else:
-    #         hemi_letter = 'R'
-    #         C = 'CORTEX_RIGHT'
-    #         wm_vtk = rh_wm_fname
-    #         pial_vtk = rh_pial_fname
-    #         wm_gii = rh_wm_gii
-    #         pial_gii = rh_pial_gii
-
-    #     # Export mask as gii file
-    #     mask_gii = surfDir + thisSub + suffix + 'mask_' + hemi + '.native.shape.gii'
-    #     giimap(wm_vtk, mask_gii, 'Mask', 'Mask', C, flip=False)
-    #     os.system("wb_command -metric-math 'ceil(mask)' " + mask_gii + ' -var mask ' + mask_gii)
-
-    #     # Curvature using White matter surface
-    #     print("Processing Curvature on WM surface")
-    #     curv_vtk = wm_vtk.replace('.vtk','.curvature.vtk')
-    #     curv_gii = wm_gii.replace('.surf.gii','.curvature.native.shape.gii')
-    #     if not os.path.exists(curv_vtk):
-    #         os.system('mirtk calculate-surface-attributes ' + wm_vtk + ' ' + curv_vtk + ' -H Curvature -smooth-weighting Combinatorial -smooth-iterations 10 -vtk-curvatures')
-    #         os.system('mirtk calculate ' + curv_vtk + ' -mul -1 -scalars Curvature -out ' + curv_vtk)
-    #         giimap(curv_vtk, curv_gii, 'Curvature', 'Curvature', C)
-    #         os.system('wb_command -metric-dilate ' + curv_gii + ' ' + wm_gii + ' 10 ' + curv_gii + ' -nearest')
-
-    # # Calculating Cortical Thickness
-    # print("Calculating Thickness")
-    # thick_vtk = wm_vtk.replace('.vtk','.thickness.vtk')
-    # dist1_vtk = wm_vtk.replace('.vtk','.dist1.vtk')
-    # dist2_vtk = wm_vtk.replace('.vtk','.dist2.vtk')
-    # thick_gii = wm_gii.replace('.surf.gii','.thickness.native.shape.gii')
-    # if not os.path.exists(thick_vtk):
-    #     os.system('mirtk evaluate-distance ' + wm_vtk + ' ' + pial_vtk + ' ' + dist1_vtk + ' -name Thickness')
-    #     os.system('mirtk evaluate-distance ' + pial_vtk + ' ' + wm_vtk + ' ' + dist2_vtk + ' -name Thickness')
-    #     os.system('mirtk calculate ' + dist1_vtk + ' -scalars Thickness -add ' + dist2_vtk + ' Thickness -div 2 -o ' + thick_vtk)
-    #     giimap(thick_vtk, thick_gii, 'Thickness', 'Thickness', C)
-    #     os.system('wb_command -metric-dilate ' + thick_gii + ' ' + wm_gii + ' 10 ' + thick_gii + ' -nearest')
-
-    # print("Inflating WM surface for visualization")
-    # wm_smooth_gii = wm_gii.replace('.surf.gii','.gaussSmooth.surf.gii')
-    # veryinflate_gii = wm_gii.replace('.surf.gii','.veryinflated.surf.gii')
-    # if not os.path.exists(veryinflate_gii):
-    #     os.system('mirtk smooth-surface ' + wm_gii + ' ' + wm_smooth_gii + ' -points -iterations 1000 -gaussian 10.0')
-    #     os.system('wb_command -set-structure ' + wm_smooth_gii + ' ' + C + ' -surface-type VERY_INFLATED -surface-secondary-type GRAY_WHITE')
-    #     os.system('wb_command -surface-inflation ' + wm_gii + ' ' + wm_smooth_gii + ' 30 1.0 2 1.05 ' + veryinflate_gii)
-
-    # print("Inflating WM surface for registration")
-    # wm_inflate2_vtk = wm_vtk.replace('.vtk','.inflated_for_sphere.vtk')
-    # wm_sulc_gii = thick_gii.replace('thickness','sulc')
-    # if not os.path.exists(wm_inflate2_vtk):
-    #     wm_nostatus_vtk = wm_vtk.replace('.vtk','.nostatus.vtk')
-    #     os.system('mirtk delete-pointset-attributes ' + wm_vtk + ' ' + wm_nostatus_vtk + ' -name InitialStatus')
-    #     os.system('mirtk deform-mesh ' + wm_nostatus_vtk + ' ' + wm_inflate2_vtk + ' -inflate-brain -track SulcalDepth')
-    #     giimap(wm_inflate2_vtk, wm_sulc_gii, 'SulcalDepth', 'Sulc', C)
-    # wm_inflate2_gii = vtktogii(wm_inflate2_vtk, 'INFLATED', 'GRAY_WHITE',C)
-
-    # print("Extracting Spherical Surface")
-    # wm_sphere_gii = wm_inflate2_gii.replace('.surf.gii','.sphere.surf.gii')
-    # if not os.path.exists(wm_sphere_gii):
-    #    freesurfer_mris_sphere(wm_gii, wm_inflate2_gii, wm_sphere_gii, hemi, C, freesurf_subdir)
-    #
-    # print("Register using MSM spherical registration FSL 6.0")
-    # fs_LR_dir = '/home/graham/Software/NeuroSoftware/HCPpipelines-master/global/templates/standard_mesh_atlases/'
-    # ref_sphere_gii = fs_LR_dir + 'fsaverage.' + hemi_letter + '_LR.spherical_std.164k_fs_LR.rotzyx.surf.gii'
-    # ref_sulc_gii = fs_LR_dir +  hemi_letter + '.refsulc.164k_fs_LR.shape.gii'
-
-    # out_base = surfDir + thisSub + suffix + hemi
-    # out_reg = out_base + '.sphere.reg.surf.gii'
-
-    # if not os.path.exists(out_reg):
-    #
-    #    # Then register using sulc maps using the above registration as starting positioni
-    #    wm_sulc_mask_gii = wm_sulc_gii.replace('.native.shape.gii','-masked.native.shape.gii')
-    #    os.system("wb_command -metric-math 'x*mask' " + wm_sulc_mask_gii + ' -var x ' + wm_sulc_gii + ' -var mask ' + mask_gii + ' -repeat')
-    #
-    #    #wm_smooth_sulc_gii = wm_sulc_gii.replace('.native.shape.gii','-smoothed.native.shape.gii')
-    #    #os.system('wb_command -metric-smoothing ' + wm_gii + ' ' + wm_sulc_mask_gii + ' 8 ' + wm_smooth_sulc_gii)
-
-    #    #wm_sulc_only_gii = wm_sulc_gii.replace('.native.shape.gii','-sulcmask.native.shape.gii')
-    #    #os.system("wb_command -metric-math 'x * (x < 0)' " + wm_sulc_only_gii + ' -var x ' + wm_smooth_sulc_gii)
-
-    #    msm_reg(wm_sphere_gii, ref_sphere_gii, wm_sulc_gii, ref_sulc_gii, out_base, 'DiffusionSurfaceConfiguration')
-    #    os.system('wb_command -set-structure ' + out_reg + ' ' + C + ' -surface-type SPHERICAL -surface-secondary-type GRAY_WHITE')
-
-    # ATLASDIR = '/media/graham/DATA2/Cortical_Anisotropy/Data/Atlas/'
-    # atlas_fname =  ATLASDIR + 'fslr.' + hemi + '.aparc.label.gii '
-    # atlas_list = ['','']
-    # atlas_list[0] = ATLASDIR + 'Conte69_atlas-v2.LR.164k_fs_LR.wb/Conte69_atlas_164k_wb/parcellations_VGD11b.' + hemi_letter + '.164k_fs_LR.label.gii'
-    # atlas_list[1] = ATLASDIR + 'Conte69_atlas-v2.LR.164k_fs_LR.wb/Conte69_atlas_164k_wb/brodmann-lobes.' + hemi_letter + '.164K_fs_LR.label.gii'
-    #
-    # out_parc_list = ['','']
-    # out_parc_list[0] = out_base + hemi + '.parcellations_VGD11b.164k_fs_LR.label.gii'
-    # out_parc_list[1] = out_base + hemi + '.brodmann-lobes.164K_fs_LR.label.gii'
-    # for atlas_ind in range(0,len(atlas_list)):
-    #    atlas_fname = atlas_list[atlas_ind]
-    #    out_parc = out_parc_list[atlas_ind]
-    #
-    #    #if not os.path.exists(out_parc):
-    #    os.system('wb_command -label-resample ' + atlas_fname + ' ' + ref_sphere_gii + ' ' + out_reg + ' BARYCENTRIC ' + out_parc + ' -largest')
-    #    #os.system('msmresample ' + out_reg + ' ' + out_parc + ' -labels ' + atlas_fname + ' -project ' + wm_sphere_gii)
-
-    # out_brodmann = out_parc_list[1]
-    # out_brodmann_dilate = out_brodmann.replace('.label.gii','-dilate.label.gii')
-    # os.system('wb_command -label-dilate ' + out_brodmann + ' ' + wm_gii + ' 20 ' + out_brodmann_dilate)
-
-    # out_brodmann_dilate_mask = out_brodmann_dilate.replace('.label.gii','-mask.label.gii')
-    # os.system("wb_command -label-mask " + out_brodmann_dilate + ' ' + mask_gii + ' ' + out_brodmann_dilate_mask)
 
     return

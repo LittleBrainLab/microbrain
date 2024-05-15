@@ -1,7 +1,5 @@
 #!/usr/local/bin/python
 import os
-import glob
-from os import system
 from os import path
 from time import time
 import subprocess
@@ -19,8 +17,6 @@ from dipy.io import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
 
 import microbrain.utils.surf_util as sutil
-
-# Check to see if program is installed to path and executable before running subprocess
 
 
 def is_tool(name):

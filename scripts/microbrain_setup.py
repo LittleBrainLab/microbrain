@@ -15,14 +15,33 @@ import nibabel as nib
 from dipy.io import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
 
-# Check to see if program is installed to path and executable before running subprocess
-
 
 def is_tool(name):
+    """
+    Check to see if program is installed to path and executable before running subprocess
+
+    Parameters
+    ----------
+    name : str
+        Name of program to check if installed
+
+    Returns
+    -------
+    bool
+        True if program is installed, False otherwise"""
     return which(name) is not None
 
 
 def fsl_ext():
+    """
+    Check to see if FSL is outputting nifti or nifti_gz files
+
+    Returns
+    -------
+    str : fsl_extension
+        Returns the FSL output extension for nifti or nifti_gz files
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -32,6 +51,40 @@ def fsl_ext():
 
 
 def dcm2nii(dataDir, outDir, rawDir, thisSub, mag_image=False, phase_image=False):
+    """
+    Convert dicom files to nifti files using dcm2niix
+
+    Parameters
+    ----------
+    dataDir : str
+        Directory with dicom files to convert
+    outDir : str
+        Output directory for converted nifti files
+    rawDir : str
+        Directory to place converted nifti files
+    thisSub : str
+        Subject ID
+    mag_image : bool
+        Flag to indicate if magnitude image
+    phase_image : bool
+        Flag to indicate if phase image
+
+    Returns
+    -------
+    niiOutFile : str
+        Path to nifti file
+    bvalOut : str
+        Path to bval file
+    bvecOut : str
+        Path to bvec file
+    niiOutJson : str
+        Path to json file
+    stdout : str
+        Standard output from dcm2niix
+    return_code : int
+        Return code from dcm2niix
+    """
+
     subDir = outDir + '/' + thisSub + '/'
     if not os.path.exists(subDir):
         subprocess.run(['mkdir', subDir], stdout=subprocess.PIPE,
@@ -101,20 +154,20 @@ def main(argv):
     make_bfiles = False
 
     help_string = """usage: microbrain_setup.py -s <Subject Directory> [options]
-    description: microbrain_setup.py creates the subject data directory for downstream processing from a microbrain.py call.
+    description: microbrain_setup.py creates the subject data directory for downstream processing from a microbrain_run.py.
     Three options exist for setting up the subject folder
     1) diffusion data no spatial distortion correction
     2) diffusion data spatial distortion correction with an additional dataset acquired with reverse phase encode
     3) diffusion data spatial distortion correction with a field map
-    Note that options below require the installation of multiple neuroimaging/python analysis software packages (see install instructions).
-    VERY BETA Version use with extreme caution. For trouble shooting help contact Graham Little (gtlittle@ualberta.ca)
+    Note that options below require the installation of multiple neuroimaging/python analysis software packages.
+    VERY BETA version use with extreme caution. For trouble shooting help contact Graham Little (grahamn.little.phd@gmail.com)
 
     mandatory arguments:
     -s <directory>,--subdir= - specifies the directory which microbrain will place all processed files
 
-    optional arguments:
     -i <dicom_directory>,--idcm=dicom_directory - uses dcm2niix to convert dicom files to NIFTI which are then placed in a newly created subject directory in the "orig" folder
 
+    optional arguments:
     --idcm_reversePE=dicom_directory - uses dcm2niix to convert reverse phase encode dicom to NIFTI, stores in "orig_reverse" folder
 
     --idcm_fieldmap=[dicom_magnitude, dicom_phase, TE_difference] - uses dcm2niix to convert reverse phase encode dicom to NIFTI, calculates fieldmap (in hz) from magnitude/phase images and stores in "orig_fieldmap" folder. TE_difference is the difference in TE between first and second images, in default siemens sequence this value is usually 2.46 ms
@@ -124,16 +177,16 @@ def main(argv):
     Examples Different Distortion Correction:
 
     1) No spatial distortion correction, b1000
-    python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory
-    python3 microbrain.py -s path_to_subject_directory -b [0,1000] --all
+    microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory
+    microbrain_run.py -s path_to_subject_directory -b [0,1000] --gibbs --eddy
 
     2) Spatial Distortion Correction with reverse phase encode
-    python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_reversePE=path_to_dicom_directory_with_reverse_PE_data
-    python3 microbrain.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --all
+    microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_reversePE=path_to_dicom_directory_with_reverse_PE_data
+    microbrain_run.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --gibbs --eddy
 
     3) Spatial Distortion Correction with siemens fieldmap data
-    python3 microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_fieldmap=[path_to_dicom_directory_with_magnitude_data, path_to_dicom_directory_with_phase_data, 2.46]
-    python3 microbrain.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --AcqReadout=0.04999 --EffectiveEcho=0.00034 --all
+    microbrain_setup.py -s path_to_subject_directory -i path_to_dicom_directory --idcm_fieldmap=[path_to_dicom_directory_with_magnitude_data, path_to_dicom_directory_with_phase_data, 2.46]
+    microbrain_run.py -s path_to_subject_directory -b [0,1000] --pe_direction=AP --AcqReadout=0.04999 --EffectiveEcho=0.00034 --gibbs --eddy
     """
 
     try:
@@ -174,8 +227,6 @@ def main(argv):
     outputDir, subID = os.path.split(outputDir)
     print('Setting Up:' + subID)
     print('OutDir: ' + outputDir)
-
-    total_t_start = time()
 
     # Make subject directory converted dicoms
     subDir = outputDir + '/' + subID + '/'

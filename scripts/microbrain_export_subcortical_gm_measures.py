@@ -9,17 +9,34 @@ from shutil import which
 import numpy as np
 import nibabel as nib
 
-from dipy.io import read_bvals_bvecs
-from dipy.core.gradients import gradient_table
-
-# Check to see if program is installed to path and executable before running subprocess
-
 
 def is_tool(name):
+    """
+    Check whether `name` is on PATH and marked as executable.
+
+    Parameters
+    ----------
+    name : str
+        The name of the program to check.
+
+    Returns
+    -------
+    bool
+        `True` if `name` is executable, `False` otherwise.
+    """
     return which(name) is not None
 
 
 def fsl_ext():
+    """
+    Returns the FSL output type extension
+
+    Returns
+    -------
+    fsl_extension : str
+        The FSL output type extension
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -29,6 +46,34 @@ def fsl_ext():
 
 
 def extract_FA_MD_from_subcortical_segmentations(subID, segDir, ffa, fmd):
+    """
+    Extracts FA and MD values from subcortical segmentations created with mbrain-seg
+
+    Parameters
+    ----------
+    subID : str
+        The subject ID
+    segDir : str
+        The directory containing the subcortical segmentations
+    ffa : str
+        The FA image file
+    fmd : str
+        The MD image file
+
+    Returns
+    -------
+    thisFA : np.array
+        The mean FA values for the subcortical segmentations
+    thisFAstd : np.array
+        The standard deviation of the FA values for the subcortical segmentations
+    thisMD : np.array
+        The mean MD values for the subcortical segmentations
+    thisMDstd : np.array
+        The standard deviation of the MD values for the subcortical segmentations
+    subcort_label : list
+        The subcortical segmentation labels
+    """
+
     md_img = nib.load(fmd)
     md_data = md_img.get_fdata()
 
@@ -60,8 +105,8 @@ def main(argv):
     subList = []
     outFile = ''
 
-    help_string = """usage: microbrain_MeasureSubcortical.py -s <subject_directory_list> -o outputFile
-    description: microbrain_measureSubcortical.py outputs
+    help_string = """usage: microbrain_export_subcortical_gm_measures.py -s <subject_directory_list> -o outputFile
+    description: This script extracts FA and MD values from subcortical segmentations created with mbrain-seg
 
     mandatory arguments:
     -s <directory>,--subList= - specifies the list of directories (e.g. [SubDir1,SubDir2,SubDir3]) for which subcortical diffusion measurements will be taken
@@ -123,8 +168,6 @@ def main(argv):
     subcort_label = [''] + subcort_label
     subcort_label = str(subcort_label).replace(
         "'", "").replace('[', '').replace(']', '')
-
-    print(subcort_label)
 
     np.savetxt(outfile + '_fa_mean.csv', np.hstack((subList_labels,
                sublist_fa.astype(np.str_))), delimiter=',', fmt='%s', header=subcort_label)

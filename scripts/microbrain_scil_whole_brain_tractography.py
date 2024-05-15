@@ -1,10 +1,4 @@
 #!/usr/local/bin/python
-from scipy.ndimage import binary_fill_holes
-from microbrain.utils import surf_util as sutil
-from dipy.core.gradients import gradient_table
-from dipy.io import read_bvals_bvecs
-import nibabel as nib
-import numpy as np
 from shutil import which
 from os import path
 import getopt
@@ -12,14 +6,34 @@ import os
 import sys
 
 
-# Check to see if program is installed to path and executable before running subprocess
-
-
 def is_tool(name):
+    """
+    Check whether `name` is on PATH and marked as executable.
+
+    Parameters
+    ----------
+    name : str
+        The name of the program to check.
+
+    Returns
+    -------
+    bool
+        `True` if `name` is executable, `False` otherwise.
+    """
+
     return which(name) is not None
 
 
 def fsl_ext():
+    """
+    Returns the FSL output type extension
+
+    Returns
+    -------
+    fsl_extension : str
+        The FSL output type extension
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -29,6 +43,23 @@ def fsl_ext():
 
 
 def run_wb_tractography(subDir, subID, outDir):
+    """
+    Run whole brain tractography using scilpy tools and white matter mask created from mbrain-seg and mbrain-cort
+
+    Parameters
+    ----------
+    subDir : str
+        The subject directory
+    subID : str
+        The subject ID
+    outDir : str
+        The output directory
+
+    Returns
+    -------
+    none
+    """
+
 
     mask_dir = outDir + '/tracking_mask'
     if not os.path.exists(mask_dir):

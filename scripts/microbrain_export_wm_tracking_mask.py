@@ -13,14 +13,33 @@ import sys
 import glob
 
 
-# Check to see if program is installed to path and executable before running subprocess
-
-
 def is_tool(name):
+    """
+    Check whether `name` is on PATH and marked as executable.
+
+    Parameters
+    ----------
+    name : str
+        The name of the program to check.
+
+    Returns
+    -------
+    bool
+        `True` if `name` is executable, `False` otherwise.
+    """
     return which(name) is not None
 
 
 def fsl_ext():
+    """
+    Returns the FSL output type extension
+
+    Returns
+    -------
+    fsl_extension : str
+        The FSL output type extension
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -30,6 +49,28 @@ def fsl_ext():
 
 
 def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
+    """
+    Extracts the white matter tracking mask for a subject using the --mbrain-seg and --mbrain-cort segmentations
+
+    Parameters
+    ----------
+    subID : str
+        The subject ID
+    segDir : str
+        The directory containing the subcortical segmentations
+    surfDir : str
+        The directory containing the cortex surface segmentations
+    dtiDir : str
+        The directory containing the DTI maps
+    regDir : str
+        The directory containing the registration files
+    outFile : str
+        The output file for the white matter mask
+
+    Returns
+    -------
+    none
+    """
 
     # Convert LH and RH wm mesh to mask
     fdwi = segDir + '/voxel_output/' + subID + '_refined_LEFT_STRIATUM' + fsl_ext()
@@ -37,7 +78,7 @@ def export_wm_mask(subID, segDir, surfDir, dtiDir, regDir, outFile):
     # LH WM to mask
     flh_wmsurf = glob.glob(
         surfDir + '/mesh_segmentation/' + subID + '*_wm_final_lh.vtk')[0]
-    print(flh_wmsurf)
+   
     flh_out = flh_wmsurf.replace('.vtk', '_mask.nii.gz')
     sutil.surf_to_volume_mask(fdwi, flh_wmsurf, 1, flh_out)
 
@@ -109,7 +150,7 @@ def main(argv):
     outFile = ''
 
     help_string = """usage: microbrain_export_wm_tracking_mask.py -s <subject_directory> -o outputFile
-    description: microbrain_export_wm_tracking_mask.py outputs
+    description: This script extracts the white matter tracking mask for a subject using the --mbrain-seg and --mbrain-cort segmentations
 
     mandatory arguments:
     -s <subject directory> - subject directory

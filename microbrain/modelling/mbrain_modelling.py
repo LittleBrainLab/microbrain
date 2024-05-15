@@ -1,10 +1,5 @@
 #!/usr/local/bin/python
 import os
-import sys
-import getopt
-import shutil
-import glob
-from os import system
 from os import path
 from time import time
 import subprocess
@@ -13,18 +8,27 @@ import numpy as np
 
 import nibabel as nib
 
-from dipy.denoise.noise_estimate import estimate_sigma
-
 import dipy.reconst.dti as dti
 import dipy.reconst.fwdti as fwdti
 import dipy.reconst.dki as dki
 
-from dipy.io import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
 from dipy.reconst.dti import fractional_anisotropy, color_fa
 
 
 def fsl_ext():
+    """
+    Gets the preferred image extension used by FSL
+
+    Parameters
+    ----------
+    none
+
+    Returns
+    -------
+    extension: a string containing the preferred output
+    """
+
     fsl_extension = ''
     if os.environ['FSLOUTPUTTYPE'] == 'NIFTI':
         fsl_extension = '.nii'
@@ -34,6 +38,52 @@ def fsl_ext():
 
 
 def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells=[0, 500, 1000], free_water=False, tolerance=100, nlls=False, ols=False):
+    """
+    Generates DTI maps from a given diffusion MRI image
+
+    Parameters
+    ----------
+    fname: string
+        The path to the diffusion MRI image
+    fmask: string
+        The path to the mask image
+    bvals: array
+        The b-values for the diffusion MRI image
+    bvecs: array
+        The b-vectors for the diffusion MRI image
+    tensorDir: string
+        The path to the output directory
+    shells: array
+        The b-values to use for the tensor model
+    free_water: boolean
+        Whether to use the free water model
+    tolerance: int
+        The tolerance for the b-values
+    nlls: boolean
+        Whether to use the non-linear least squares method
+    ols: boolean
+        Whether to use the ordinary least squares method
+
+    Returns
+    -------
+    fa_fname: string
+        The path to the fractional anisotropy image
+    md_fname: string
+        The path to the mean diffusivity image
+    fa_rgb_fname: string
+        The path to the fractional anisotropy RGB image
+    ad_fname: string
+        The path to the axial diffusivity image
+    rd_fname: string
+        The path to the radial diffusivity image
+    evec_fname: string
+        The path to the eigenvectors image
+    pevec_fname: string
+        The path to the primary eigenvectors image
+    tensor_fname: string
+        The path to the tensor image
+    """
+
     print("Starting DTI Map Generation")
     fbasename = os.path.basename(fname)
 
@@ -164,6 +214,27 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells=[0,
 
 
 def output_DKI_maps(fname, fmask, bvals, bvecs, dkiDir):
+    """
+    Generates DKI maps from a given diffusion MRI image
+
+    Parameters
+    ----------
+    fname: string
+        The path to the diffusion MRI image
+    fmask: string
+        The path to the mask image
+    bvals: array
+        The b-values for the diffusion MRI image
+    bvecs: array
+        The b-vectors for the diffusion MRI image
+    dkiDir: string
+        The path to the output directory
+
+    Returns
+    -------
+    none
+    """
+
     print("Starting DKI Map Generation")
     prefix = 'dki'
     fbasename = os.path.basename(fname)

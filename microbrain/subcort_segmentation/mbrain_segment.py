@@ -42,14 +42,14 @@ RIGHT_STRIATUM_IDX = 166
 VENT_IDX = 200
 
 
-# move these functions to mbrain_io.py
 def is_tool(name):
     """
     Checks to see if third party binary is installed and accessible by command line
 
     Parameters
     ----------
-    name: the name of the command to look for
+    name: string
+        the name of the command to look for
 
     Returns
     -------
@@ -87,14 +87,19 @@ def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
 
     Parameters
     ----------
-    fsource: image in native space
-    ftemplate: image template in MNI space (or normal space)
-    fatlas: 4D nifti file in MNI space to be registered
-    regDir: Directory to store outpu
+    fsource: string
+        filename of image in native space
+    ftemplate: string
+        filename of image template in MNI space (or normal space)
+    fatlas: string
+        filename of 4D nifti file in MNI space to be registered
+    regDir: string
+        directory to store output
 
     Optional Parameters
     -------------------
-    cpu_num: integer defining the number of cpu threads to use for registration
+    cpu_num: integer
+        number of cpu threads to use for registration
 
     Returns
     -------
@@ -154,17 +159,24 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
 
     Parameters
     ----------
-    fharvard: filename for the harvard probabilistic atlas to be used (usually registered to native space)
-    output_prefix: prefix used for output filenames
-    outDir: Output directory to store all files
+    fharvard: string
+        filename for the harvard probabilistic atlas to be used (usually registered to native space)
+    output_prefix: string
+        prefix used for filenames for microbrain subject
+    outDir: string
+        output directory to store all files
 
     Optional Parameters:
     --------------------
-    md_file: filename for Mean Diffusivity Map used to remove voxels from labels (useful in case of poor registration to native space)
-    md_thresh: Removes voxels in lables with MD > md_thresh
+    md_file: string
+        filename for mean diffusivity map used to remove voxels from labels (useful in case of poor registration to native space)
+    md_thresh: float
+        removes voxels in lables with MD > md_thresh
 
-    fa_file: filename for Fractional Anisotropy Map used to remove voxels from labels (useful in case of poor registration to native space)
-    fa_thresh: Removes voxels in lables with FA > fa_thresh
+    fa_file: string
+        filename for fractional anisotropy map used to remove voxels from labels (useful in case of poor registration to native space)
+    fa_thresh: string
+        removes voxels in lables with FA > fa_thresh
 
     Returns
     -------
@@ -287,19 +299,20 @@ def initial_voxel_labels_from_harvard(fharvard, output_prefix, outDir, md_file=N
 
     return
 
-# move to surf_util.py
-
-
 def extract_surfaces_from_labels(flabels, label_list, outDir, fout_prefix):
     """
     Given a 3D nifti file containing a voxelwise labeling of structures, output a smoothed 3D surface representation of the labels
 
     Parameters
     ----------
-    flabels: 3D nifti file containing labels
-    label_list: list of label integers indicating which labels to convert to surfaces (e.g. [1, 3])
-    outDir: directory to output the meshes
-    fout_prefix: filen
+    flabels: string
+        filename for 3D nifti file containing labels
+    label_list: string
+        list of label integers indicating which labels to convert to surfaces (e.g. [1, 3])
+    outDir: string
+        directory to output the meshes
+    fout_prefix: string
+        prefix for output files
 
     Returns
     -------
@@ -343,17 +356,25 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 
     Parameters
     ----------
-    fdwi: filename for mean diffusion weigthed image (suggested b1000) used for globus pallidus segmentation
-    ffa: filename for fa map
-    ffmd: filename for md map
-    fharvard_native: FSL harvard probabilistic atlas transformed to native space
-    segDir: parent directory to store pipeline output
-    initSegDir: directory containing initial structure surfaces generated using initial_voxel_labels_from_harvard
-    subID: the subID for the current subject (used as prefix for output)
+    fdwi: string
+        filename for mean diffusion weigthed image (suggested b1000) used for globus pallidus segmentation
+    ffa: string
+        filename for fa map
+    ffmd: string
+        filename for md map
+    fharvard_native: string
+        FSL harvard probabilistic atlas transformed to native space
+    segDir: string
+        parent directory to store pipeline output
+    initSegDir: string
+        directory containing initial structure surfaces generated using initial_voxel_labels_from_harvard
+    subID: string
+        microbrain subject ID
 
     Optional Parameters
     -------------------
-    cpu_num: number of cpu threads for MIRTK deform-mesh to use (default is mirtk default of all available threads)
+    cpu_num: integer
+        number of cpu threads for MIRTK deform-mesh to use (default is mirtk default of all available threads)
 
     Returns
     -------
@@ -844,14 +865,19 @@ def segment(procDir, subID, preproc_suffix, shell_suffix, cpu_num=0):
 
     Parameters
     ----------
-    procDir: parent director containing subject
-    subID: the subject to be processed
-    preproc_suffix: suffix detailing what preprocessing has been performed
-    shell_suffix: suffix detailing what shells were used when running microbrain
+    procDir: string
+        parent director containing subject
+    subID: string
+        the microbrain subject to be processed
+    preproc_suffix: string
+        suffix detailing what preprocessing has been performed
+    shell_suffix: string
+        suffix detailing what shells were used when running microbrain
 
     Optional Parameters
     -------------------
-    cpu_num: number of threads to use for computationally intense tasks
+    cpu_num: integer
+        number of threads to use for computationally intense tasks
 
     Returns
     -------
