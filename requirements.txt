@@ -4,5 +4,4 @@ scipy
 vtk
 matplotlib
 nlsam==0.7
-open3d-cpu
 scikit-image
