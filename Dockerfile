@@ -1,4 +1,4 @@
-from scilus/scilus-freesurfer:1.6.0
+from scilus/scilus-freesurfer:2.0.2
 
 WORKDIR /
 
@@ -26,3 +26,10 @@ RUN pip${PYTHON_MOD} install --upgrade pip && \
     pip${PYTHON_MOD} install -U setuptools && \
     pip${PYTHON_MOD} install --ignore-installed -r requirements.txt && \
     pip${PYTHON_MOD} install -e .
+
+# Install
+WORKDIR /
+RUN git clone https://github.com/LittleBrainLab/meshtrack.git
+WORKDIR /meshtrack
+RUN pip${PYTHON_MOD} install --ignore-installed -r requirements.txt && \
+    pip${PYTHON_MOD} install -e . --use-pep517
