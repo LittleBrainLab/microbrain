@@ -7,6 +7,7 @@ from shutil import which
 from os import system, environ, path
 import numpy as np
 import nibabel as nib
+import inspect
 
 from skimage.morphology import binary_erosion
 
@@ -79,6 +80,41 @@ def fsl_ext():
         fsl_extension = '.nii.gz'
     return fsl_extension
 
+
+def get_fsl_standard_dir():
+    """
+    Return tissue directory in microbrain repository
+
+    Returns
+    -------
+    tissue_dir: string
+        tissue path
+    """
+
+    import microbrain  # ToDo. Is this the only way?
+    module_path = inspect.getfile(microbrain)
+
+    fsl_standard_dir = path.dirname(module_path) + "/data/fsl/standard/"
+
+    return fsl_standard_dir
+
+
+def get_fsl_atlas_dir():
+    """
+    Return tissue directory in microbrain repository
+
+    Returns
+    -------
+    tissue_dir: string
+        tissue path
+    """
+
+    import microbrain  # ToDo. Is this the only way?
+    module_path = inspect.getfile(microbrain)
+
+    fsl_atlas_dir = path.dirname(module_path) + "/data/fsl/atlases/"
+
+    return fsl_atlas_dir
 
 def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
     """
@@ -902,11 +938,9 @@ def segment(procDir, subID, preproc_suffix, shell_suffix, cpu_num=0):
     fmd = subDir + '/DTI_maps/' + subID + suffix + '_MD' + fsl_ext()
 
     # Register probability maps
-    ftemplate = environ['FSLDIR'] + \
-        '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
+    ftemplate = get_fsl_standard_dir() + 'FSL_HCP1065_FA_1mm.nii.gz'
 
-    fharvard = environ['FSLDIR'] + \
-        '/data/atlases/HarvardOxford/HarvardOxford-sub-prob-1mm.nii.gz'
+    fharvard = get_fsl_atlas_dir() + 'HarvardOxford/HarvardOxford-sub-prob-1mm.nii.gz'
     fharvard_native = register_probatlas_to_native(
         ffa, ftemplate, fharvard, regDir, cpu_num=cpu_num)
 
