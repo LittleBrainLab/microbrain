@@ -3,5 +3,4 @@ dipy
 scipy
 vtk
 matplotlib
-nlsam==0.7
 scikit-image
