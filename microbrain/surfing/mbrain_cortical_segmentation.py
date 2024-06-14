@@ -219,11 +219,11 @@ def freesurf_fix_topology(wm_surf_fname, C, freesurf_subdir):
     os.system('mris_convert ' + wm_surf_gii + ' ' +
               freesurf_subdir + 'surf/' + hemi + '.smoothwm')
     os.system('mris_convert ' + wm_surf_gii + ' ' +
-              freesurf_subdir + 'surf/' + hemi + '.orig')
+              freesurf_subdir + 'surf/' + hemi + '.orig.nofix')
     os.system('mris_convert ' + wm_inflate_gii + ' ' +
-              freesurf_subdir + 'surf/' + hemi + '.inflated')
+              freesurf_subdir + 'surf/' + hemi + '.inflated.nofix')
     os.system('mris_convert ' + wm_sphere_gii + ' ' +
-              freesurf_subdir + 'surf/' + hemi + '.qsphere')
+              freesurf_subdir + 'surf/' + hemi + '.qsphere.nofix')
 
     # Run mris_fix_topology in the temp freesurf folder
     freesurf_sub = os.path.basename(os.path.normpath(freesurf_subdir))
