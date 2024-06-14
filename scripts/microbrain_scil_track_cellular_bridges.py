@@ -7,6 +7,25 @@ import getopt
 import os
 import sys
 from glob import glob
+import inspect
+
+
+def get_fsl_atlas_dir():
+    """
+    Return tissue directory in microbrain repository
+
+    Returns
+    -------
+    tissue_dir: string
+        tissue path
+    """
+
+    import microbrain  # ToDo. Is this the only way?
+    module_path = inspect.getfile(microbrain)
+
+    fsl_atlas_dir = os.path.dirname(module_path) + "/data/fsl/atlases/"
+
+    return fsl_atlas_dir
 
 
 def is_tool(name):
@@ -176,7 +195,7 @@ def run_cell_bridge_tractography(subDir, subID, outDir, algo='prob', nbr_seeds=1
     # Generating globus tractogram here just for QA purposes (is not included in gm cell bridge reconstruction)
     for hemi in ['LEFT', 'RIGHT']:
         # register JHU atlas to subject space
-        atlas = '/usr/local/fsl/data/atlases/JHU/JHU-ICBM-labels-1mm.nii.gz'
+        atlas = get_fsl_atlas_dir() + 'JHU/JHU-ICBM-labels-1mm.nii.gz'
         regDir = subDir + '/registration/'
         affine = regDir + '/ants_native2mni_0GenericAffine.mat'
         warp = regDir + '/ants_native2mni_1InverseWarp.nii.gz'

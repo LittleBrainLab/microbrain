@@ -5,8 +5,7 @@ import microbrain.utils.surf_util as sutil
 from microbrain.subcort_segmentation.mbrain_segment import register_probatlas_to_native
 
 from dipy.align.reslice import reslice
-from scipy.ndimage.morphology import binary_fill_holes
-from scipy.ndimage.morphology import binary_closing, binary_dilation
+from scipy.ndimage.morphology import (binary_fill_holes, binary_closing, binary_dilation)
 from scipy.ndimage.measurements import center_of_mass
 from scipy import ndimage
 from os import system, environ, path
@@ -58,6 +57,41 @@ def get_tissue_dir():
     tissue_dir = os.path.dirname(module_path) + "/data/tissuepriors/"
 
     return tissue_dir
+
+
+def get_fsl_standard_dir():
+    """
+    Return tissue directory in microbrain repository
+
+    Returns
+    -------
+    tissue_dir: string
+        tissue path
+    """
+
+    import microbrain  # ToDo. Is this the only way?
+    module_path = inspect.getfile(microbrain)
+
+    fsl_standard_dir = os.path.dirname(module_path) + "/data/fsl/standard/"
+
+    return fsl_standard_dir
+
+def get_fsl_atlas_dir():
+    """
+    Return tissue directory in microbrain repository
+
+    Returns
+    -------
+    tissue_dir: string
+        tissue path
+    """
+
+    import microbrain  # ToDo. Is this the only way?
+    module_path = inspect.getfile(microbrain)
+
+    fsl_atlas_dir = os.path.dirname(module_path) + "/data/fsl/atlases/"
+
+    return fsl_atlas_dir
 
 def vtktogii(vtk_fname, giiT, giiT2, C):
     """
@@ -186,11 +220,11 @@ def freesurf_fix_topology(wm_surf_fname, C, freesurf_subdir):
     os.system('mris_convert ' + wm_surf_gii + ' ' +
               freesurf_subdir + 'surf/' + hemi + '.smoothwm')
     os.system('mris_convert ' + wm_surf_gii + ' ' +
-              freesurf_subdir + 'surf/' + hemi + '.orig')
+              freesurf_subdir + 'surf/' + hemi + '.orig.nofix')
     os.system('mris_convert ' + wm_inflate_gii + ' ' +
-              freesurf_subdir + 'surf/' + hemi + '.inflated')
+              freesurf_subdir + 'surf/' + hemi + '.inflated.nofix')
     os.system('mris_convert ' + wm_sphere_gii + ' ' +
-              freesurf_subdir + 'surf/' + hemi + '.qsphere')
+              freesurf_subdir + 'surf/' + hemi + '.qsphere.nofix')
 
     # Run mris_fix_topology in the temp freesurf folder
     freesurf_sub = os.path.basename(os.path.normpath(freesurf_subdir))
@@ -493,7 +527,7 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
     finter: string
         filename of interface mask
     finter_hippo: string
-        filename of interface mask with hippocampus
+        filename of inteos.environ['FSLDIR'] + \rface mask with hippocampus
     fwm_dist: string
         filename of white matter distance map
     fcortex_dist: string
@@ -537,8 +571,7 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
     # Get root project directory (FIX THIS LATER)
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    ftemplate = os.environ['FSLDIR'] + \
-        '/data/standard/FSL_HCP1065_FA_1mm.nii.gz'
+    ftemplate = get_fsl_standard_dir() + 'FSL_HCP1065_FA_1mm.nii.gz'
     fgm = get_tissue_dir() + 'avg152T1_gm_resampled.nii.gz'
     fwm = get_tissue_dir() + 'avg152T1_wm_resampled.nii.gz'
     fcsf = get_tissue_dir() + 'avg152T1_csf_resampled.nii.gz'
@@ -601,15 +634,13 @@ def generate_initial_lr_wm(fwm_lh, fwm_rh, finter, finter_hippo, fwm_dist, fcort
         thalamus_label[nib.load(thisStructFile).get_fdata() > 0] = 1
 
     # Read in harvard atlas to separate sub structures
-    fharvard = environ['FSLDIR'] + \
-        '/data/atlases/HarvardOxford/HarvardOxford-sub-prob-1mm.nii.gz'
+    fharvard = get_fsl_atlas_dir() + 'HarvardOxford/HarvardOxford-sub-prob-1mm.nii.gz'
     fharvard_native = register_probatlas_to_native(
         ffa, ftemplate, fharvard, regDir, cpu_num=cpu_num)
     harvard_img = nib.load(fharvard_native)
     harvard_data = harvard_img.get_fdata()
 
-    fmni = environ['FSLDIR'] + \
-        '/data/atlases/MNI/MNI-prob-1mm.nii.gz'
+    fmni = get_fsl_atlas_dir() + 'MNI/MNI-prob-1mm.nii.gz'
     fmni_native = register_probatlas_to_native(
         ffa, ftemplate, fmni, regDir, cpu_num=cpu_num)
     mni_img = nib.load(fmni_native)
