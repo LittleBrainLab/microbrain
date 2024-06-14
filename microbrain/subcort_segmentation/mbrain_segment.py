@@ -5,6 +5,7 @@ import vtk
 from shutil import which
 
 from os import system, environ, path
+import os
 import numpy as np
 import nibabel as nib
 
@@ -105,8 +106,7 @@ def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
     -------
     fatlas_out: filename for atlas registered to native space
     """
-    if not path.exists(regDir):
-        system('mkdir ' + regDir)
+    os.makedirs(regDir, exist_ok=True)
 
     if cpu_num > 0:
         cpu_str = ' -n ' + str(cpu_num)
@@ -405,24 +405,13 @@ def deform_subcortical_surfaces(fdwi, ffa, fmd, fharvard_native, segDir, initSeg
 
     # Make output folders
     MDFA_Dir = segDir + 'md_plus_fa_maps/'
-    if not path.exists(MDFA_Dir):
-        system('mkdir ' + MDFA_Dir)
-
     probForceDir = segDir + 'probability_force_maps/'
-    if not path.exists(probForceDir):
-        system('mkdir ' + probForceDir)
-
     meshDir = segDir + 'mesh_output/'
-    if not path.exists(meshDir):
-        system('mkdir ' + meshDir)
-
     voxelDir = segDir + 'voxel_output/'
-    if not path.exists(voxelDir):
-        system('mkdir ' + voxelDir)
-
     atroposDir = segDir + 'atropos_hippoamyg_seg/'
-    if not path.exists(atroposDir):
-        system('mkdir ' + atroposDir)
+
+    for currDir in [MDFA_Dir, probForceDir, meshDir, voxelDir, atroposDir]:
+        os.makedirs(currDir, exist_ok=True)
 
     fsubcortseg_vtk = meshDir + subID + seg_prefix + '_subcortGM.vtk'
     if not path.exists(fsubcortseg_vtk):
@@ -911,14 +900,12 @@ def segment(procDir, subID, preproc_suffix, shell_suffix, cpu_num=0):
         ffa, ftemplate, fharvard, regDir, cpu_num=cpu_num)
 
     # Parent Directory to store all output
-    if not path.exists(segDir):
-        system('mkdir ' + segDir)
+    os.makedirs(segDir, exist_ok=True)
 
     # Directory to store initial meshes
     initSegDir = segDir + 'structure_initialization/'
-    if not path.exists(initSegDir):
-        system('mkdir ' + initSegDir)
-
+    os.makedirs(initSegDir, exist_ok=True)
+    
     initial_voxel_labels_from_harvard(
         fharvard_native, subID, initSegDir, md_file=fmd, fa_file=ffa)
 

@@ -13,6 +13,7 @@ from os import system, environ, path
 
 import os
 import inspect
+import shutil
 import vtk
 from vtk.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 
@@ -193,7 +194,7 @@ def freesurf_fix_topology(wm_surf_fname, C, freesurf_subdir):
 
     # Run mris_fix_topology in the temp freesurf folder
     freesurf_sub = os.path.basename(os.path.normpath(freesurf_subdir))
-    print("Freesurf Sub:" + freesurf_sub)
+    print("Freesurfer Sub:" + freesurf_sub)
     wm_orig_fix_fname = wm_surf_fname.replace('.vtk', '_fix.vtk')
     if not os.path.exists(wm_orig_fix_fname):
         os.system('mris_fix_topology ' + freesurf_sub + ' ' + hemi)
@@ -201,7 +202,6 @@ def freesurf_fix_topology(wm_surf_fname, C, freesurf_subdir):
                   hemi + '.orig ' + hemi + '.orig.vtk')
         os.system('mv ' + freesurf_subdir + 'surf/' +
                   hemi + '.orig.vtk ' + wm_orig_fix_fname)
-
     return wm_orig_fix_fname
 
 
@@ -351,9 +351,7 @@ def register_probmap_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
     fatlas_out: string
         filename for atlas registered to native space
     """
-
-    if not path.exists(regDir):
-        system('mkdir ' + regDir)
+    os.makedirs(regDir, exist_ok=True)
 
     if cpu_num > 0:
         cpu_str = ' -n ' + str(cpu_num)
@@ -439,8 +437,7 @@ def multi_channel_tissue_classifier(ffa, fdwi, fmask, fgm_native, fwm_native, fc
     tissue_nclasses = 3
 
     print("Starting Tissue Segmentation")
-    if not path.exists(segDir):
-        system('mkdir ' + segDir)
+    os.makedirs(segDir, exist_ok=True)
 
     tissue_base_name = segDir + 'tissue_prob_' + tissue_prob_suffix + '_'
     ftissuelabels = tissue_base_name + 'out_seg' + fsl_ext()
@@ -449,8 +446,7 @@ def multi_channel_tissue_classifier(ffa, fdwi, fmask, fgm_native, fwm_native, fc
         # Copy tissue probability maps to base tissue fname
         fprob_list = [fgm_native, fwm_native, fcsf_native]
         for i in range(0, tissue_nclasses):
-            system('cp ' + fprob_list[i] + ' ' +
-                   tissue_base_name + str(i+1).zfill(2) + fsl_ext())
+            shutil.copyfile(fprob_list[i], tissue_base_name + str(i+1).zfill(2) + fsl_ext())
             process = subprocess.run(['fslcpgeom', fdwi, tissue_base_name + str(i+1).zfill(
                 2) + fsl_ext()], stdout=subprocess.PIPE, universal_newlines=True)
 
@@ -458,18 +454,19 @@ def multi_channel_tissue_classifier(ffa, fdwi, fmask, fgm_native, fwm_native, fc
             ['fslcpgeom', fdwi, ffa], stdout=subprocess.PIPE, universal_newlines=True)
         process = subprocess.run(
             ['fslcpgeom', fdwi, fmask], stdout=subprocess.PIPE, universal_newlines=True)
-        system('Atropos' +
-               ' -a [' + ffa + ']' +
-               ' -a [' + fdwi + ']' +
-               ' -x ' + fmask +
-               ' -i PriorProbabilityImages[' + str(tissue_nclasses) + ', ' + tissue_base_name + '%02d' + fsl_ext() + ',' + str(PriorWeight) + ',0.0001]' +
-               ' -m [0.3, 2x2x2] ' +
-               ' -s 1x2 -s 1x3 -s 2x3 ' +
-               ' --use-partial-volume-likelihoods false ' +
-               ' -o [' + ftissuelabels + ',' + ftissueprobs_base + '%02d' + fsl_ext() + ']' +
-               ' -k HistogramParzenWindows[1.0,32]')
+        cmd = 'Atropos' + \
+              ' -a [' + ffa + ']' + \
+               ' -a [' + fdwi + ']' + \
+               ' -x ' + fmask + \
+               ' -i PriorProbabilityImages[' + str(tissue_nclasses) + ', ' + tissue_base_name + '%02d' + fsl_ext() + ',' + str(PriorWeight) + ',0.0001]' + \
+               ' -m [0.3, 2x2x2] ' + \
+               ' -s 1x2 -s 1x3 -s 2x3 ' + \
+               ' --use-partial-volume-likelihoods false ' + \
+               ' -o [' + ftissuelabels + ',' + ftissueprobs_base + '%02d' + fsl_ext() + ']' + \
+               ' -k HistogramParzenWindows[1.0,32]'
+        system(cmd)
 
-        # remove files used for input to Atropos
+        # Remove files used for input to Atropos
         for i in range(0, tissue_nclasses):
             system('rm ' + tissue_base_name + str(i+1).zfill(2) + fsl_ext())
     else:
@@ -1215,6 +1212,7 @@ def split_surface(surf_fname, lh_surf_fname, rh_surf_fname):
     none
     """
     surf = sutil.read_surf_vtk(surf_fname)
+    print(surf_fname)
     [lh_surf, rh_surf] = sutil.split_surface_by_label(surf)
     sutil.write_surf_vtk(lh_surf, lh_surf_fname)
     sutil.write_surf_vtk(rh_surf, rh_surf_fname)
@@ -1283,24 +1281,13 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     print("Surfing: " + thisSub)
     subDir = outDir + '/' + thisSub + '/'
     surfDir = subDir + 'surf/'
-    if not os.path.exists(surfDir):
-        os.system('mkdir ' + surfDir)
-
     tissueDir = surfDir + 'tissue_classification/'
-    if not os.path.exists(tissueDir):
-        os.system('mkdir ' + tissueDir)
-
     initialMaskDir = surfDir + 'initial_masks/'
-    if not os.path.exists(initialMaskDir):
-        os.system('mkdir ' + initialMaskDir)
-
     initialSurfDir = surfDir + 'initial_surfaces/'
-    if not os.path.exists(initialSurfDir):
-        os.system('mkdir ' + initialSurfDir)
-
     surfSegDir = surfDir + 'mesh_segmentation/'
-    if not os.path.exists(surfSegDir):
-        os.system('mkdir ' + surfSegDir)
+
+    for curr_dir in [surfDir, tissueDir, initialMaskDir, initialSurfDir, surfSegDir]:
+        os.makedirs(curr_dir, exist_ok=True)
 
     if preproc_suffix != '':
         suffix = '_' + preproc_suffix + '_' + shell_suffix
@@ -1355,7 +1342,7 @@ def generate_surfaces_from_dwi(fmask, voxelDir, outDir, thisSub, preproc_suffix,
     # Refine WM Surface on mean DWI
     wm_final_fname = wm_surf_fname.replace('.vtk', '_final.vtk')
     if use_tensor_wm:
-        os.system('cp ' + wm_tensor_fname + ' ' + wm_final_fname)
+        shutil.copyfile(wm_tensor_fname, wm_final_fname)
     else:
         print("Refining WM Surface with mean DWI only")
         if not os.path.exists(wm_final_fname):
