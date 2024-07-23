@@ -184,7 +184,7 @@ def register_probatlas_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
                ' -i ' + fatlas +
                ' -o ' + fatlas_out)
     else:
-        print("ANTs nonlinear registeration of atlases already performed")
+        print("ANTs nonlinear registration of atlases already performed")
 
     return fatlas_out
 

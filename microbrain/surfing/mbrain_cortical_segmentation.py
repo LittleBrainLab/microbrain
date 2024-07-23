@@ -232,8 +232,8 @@ def freesurf_fix_topology(wm_surf_fname, C, freesurf_subdir):
     wm_orig_fix_fname = wm_surf_fname.replace('.vtk', '_fix.vtk')
     if not os.path.exists(wm_orig_fix_fname):
         os.system('mris_fix_topology ' + freesurf_sub + ' ' + hemi)
-        os.system('mris_convert ' + freesurf_subdir + 'surf/' +
-                  hemi + '.orig ' + hemi + '.orig.vtk')
+        os.system('mris_convert ' + freesurf_subdir + 'surf/' + hemi + '.orig ' + 
+                                    freesurf_subdir + 'surf/' + hemi + '.orig.vtk')
         os.system('mv ' + freesurf_subdir + 'surf/' +
                   hemi + '.orig.vtk ' + wm_orig_fix_fname)
     return wm_orig_fix_fname
@@ -426,7 +426,7 @@ def register_probmap_to_native(fsource, ftemplate, fatlas, regDir, cpu_num=0):
                ' -i ' + fatlas +
                ' -o ' + fatlas_out)
     else:
-        print("ANTs nonlinear registeration of atlases already performed")
+        print("ANTs nonlinear registration of atlases already performed")
 
     return fatlas_out
 
