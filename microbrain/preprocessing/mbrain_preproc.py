@@ -181,7 +181,7 @@ def denoiseMPPCA(fdwi, fbval, fbvec, denoiseDir, patch_radius=2):
 
     if not os.path.exists(fdenoise):
         img = nib.load(fdwi)
-        data = img.get_fdata()
+        data = img.get_fdata(dtype=np.float32)
 
         bvals, bvecs = read_bvals_bvecs(fbval, fbvec)
         gtab = gradient_table(bvals, bvecs)
@@ -212,7 +212,7 @@ def denoiseNONLOCAL(fdwi, fmask, denoiseDir):
     fdiff = fdenoise.replace(fsl_ext(), 'diff' + fsl_ext())
     if not os.path.exists(fdenoise):
         img = nib.load(fdwi)
-        data = img.get_fdata()
+        data = img.get_fdata(dtype=np.float32)
 
         mask_img = nib.load(fmask)
         mask_data = mask_img.get_fdata()
@@ -279,7 +279,7 @@ def fslv6p0_fake_brain_mask(fgibbs, bvals, tolerance=100):
     fmask = out_file.replace('BET', 'BET_mask' + fsl_ext())
     if not os.path.exists(fmask):
         img = nib.load(fgibbs)
-        data = img.get_fdata()
+        data = img.get_fdata(dtype=np.float32)
 
         b0_idx = np.squeeze(
             np.array(np.where(np.logical_and(bvals < tolerance, bvals > -tolerance))))
@@ -306,7 +306,7 @@ def fslv6p0_brain_mask(fgibbs, bvals, fval, gval, tolerance=100):
     # Make b0 average
     if not os.path.exists(fb0avg):
         img = nib.load(fgibbs)
-        data = img.get_fdata()
+        data = img.get_fdata(dtype=np.float32)
         b0_idx = np.squeeze(
             np.array(np.where(np.logical_and(bvals < tolerance, bvals > -tolerance))))
 
@@ -498,7 +498,7 @@ def n4correct_by_b0(fb0avg, fmask, fgibbs, preprocDWIDir):
     print(fn4dwi)
     if not os.path.exists(fn4dwi):
         gibbs_img = nib.load(fgibbs)
-        gibbs_data = gibbs_img.get_fdata()
+        gibbs_data = gibbs_img.get_fdata(dtype=np.float32)
 
         n4dwi_data = np.zeros(gibbs_data.shape)
 
@@ -556,7 +556,7 @@ def output_DWI_maps(fb0avg, fmask, feddy, bvals, shells, meanDWIDir, preproc_suf
                                str(shells[0]) + fsl_ext())
     if not os.path.exists(fmeanshell):
         eddy_img = nib.load(feddy)
-        eddy_data = eddy_img.get_fdata()
+        eddy_data = eddy_img.get_fdata(dtype=np.float32)
 
     for shell in shells:
         fmeanshell = meanDWIDir + \
@@ -608,7 +608,7 @@ def output_DWI_maps_noN4(fb0avg, fmask, feddy, bvals, shells, meanDWIDir, prepro
                                str(shells[0]) + fsl_ext())
     if not os.path.exists(fmeanshell):
         eddy_img = nib.load(feddy)
-        eddy_data = eddy_img.get_fdata()
+        eddy_data = eddy_img.get_fdata(dtype=np.float32)
 
     for shell_idx in range(0, len(shells)):
         shell = shells[shell_idx]

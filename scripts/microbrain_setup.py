@@ -258,7 +258,7 @@ def main(argv):
 
         # generate reverse PE bval/bvec files if only b0s
         if make_bfiles:
-            reversePE_data = nib.load(fdwi_reversePE).get_fdata()
+            reversePE_data = nib.load(fdwi_reversePE).get_fdata(dtype=np.float32)
             if not os.path.exists(fbval_reversePE):
                 print(
                     'microbrain: no bval file found, assuming reverse PE file are only b0 volumes')
