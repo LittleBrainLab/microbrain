@@ -57,7 +57,7 @@ RUN mv data_atlases-2103.0/* /fsl/data/atlases/
 # Add mirtk
 ADD bin/mirtk /
 RUN ./mirtk --appimage-extract
-ENV PATH /squashfs-root/usr/bin:$PATH
+ENV PATH=/squashfs-root/usr/bin:$PATH
 RUN rm -f /mirtk
 
 # Install nlsam
@@ -71,11 +71,11 @@ RUN mv /nlsam_denoising /usr/local/bin/
 RUN wget https://www.humanconnectome.org/storage/app/media/workbench/workbench-linux64-v1.5.0.zip
 RUN unzip workbench-linux64-v1.5.0.zip
 RUN echo 'export PATH=$PATH:/workbench/bin_linux64' >> ~/.bashrc
-ENV PATH /workbench/bin_linux64:$PATH
+ENV PATH=/workbench/bin_linux64:$PATH
 
 # Install Unring
 RUN git clone https://bitbucket.org/reisert/unring.git
-ENV PATH /unring/fsl:$PATH
+ENV PATH=/unring/fsl:$PATH
 
 # Install microbrain
 #RUN git clone https://github.com/LittleBrainLab/microbrain.git
@@ -86,7 +86,7 @@ ADD . /microbrain
 RUN rm /microbrain/bin/mirtk
 
 WORKDIR /microbrain
-ENV PATH /microbrain/bin:$PATH
+ENV PATH=/microbrain/bin:$PATH
 
 RUN pip${PYTHON_MOD} install --upgrade pip && \
     pip${PYTHON_MOD} install -U setuptools && \
@@ -100,4 +100,8 @@ WORKDIR /meshtrack
 RUN pip${PYTHON_MOD} install --ignore-installed -r requirements.txt && \
     pip${PYTHON_MOD} install -e . --use-pep517
 
+WORKDIR /
+RUN cp /scilpy/scilpy/image/__init__.py /scilpy/scilpy/surfaces/__init__.py
+WORKDIR /scilpy
+RUN pip${PYTHON_MOD} install -e .
 #ENV APPIMAGE_EXTRACT_AND_RUN=1
