@@ -283,7 +283,7 @@ def main(argv):
     elif bet_mask:
         # Extract b0s
         fout_img = nib.load(fout)
-        fout_data = fout_img.get_fdata()
+        fout_data = fout_img.get_fdata(dtype=np.float32)
 
         b0_data = fout_data[:, :, :, np.logical_and(bvals < 50, bvals > -50)]
         firstb0_data = b0_data[:, :, :, 0]
@@ -299,7 +299,7 @@ def main(argv):
         fmd = fout.replace(fsl_ext(), '_MD' + fsl_ext())
         if not os.path.exists(fmd):
             fout_img = nib.load(fout)
-            fout_data = fout_img.get_fdata()
+            fout_data = fout_img.get_fdata(dtype=np.float32)
 
             tolerance = 50
             b_idx = []
@@ -338,7 +338,7 @@ def main(argv):
 
     else:  # Create a mask inclusive of all voxels
         fout_img = nib.load(fout)
-        fout_data = fout_img.get_fdata()
+        fout_data = fout_img.get_fdata(dtype=np.float32)
         fmask = fout.replace(fsl_ext(), '_fake_mask' + fsl_ext())
         fake_mask_data = np.ones(np.shape(np.squeeze(fout_data[:, :, :, 0])))
         nib.save(nib.Nifti1Image(fake_mask_data, fout_img.affine), fmask)
@@ -405,7 +405,7 @@ def main(argv):
         # output b0s
         fb0s = fout.replace(fsl_ext(), '_b0vols' + fsl_ext())
         dwi_img = nib.load(fout)
-        dwi_vol = dwi_img.get_fdata()
+        dwi_vol = dwi_img.get_fdata(dtype=np.float32)
         b0_vols = dwi_vol[:, :, :, np.logical_and(
             bvals >= -20, bvals <= 20)]
         nib.save(nib.Nifti1Image(b0_vols, dwi_img.affine), fb0s)
@@ -528,7 +528,7 @@ def main(argv):
         ffirstb0_undistort = fout.replace(fsl_ext(), '_firstb0' + fsl_ext())
         if not os.path.exists(ffirstb0_undistort):
             fout_img = nib.load(fout)
-            fout_data = fout_img.get_fdata()
+            fout_data = fout_img.get_fdata(dtype=np.float32)
 
             b0_data = fout_data[:, :, :, np.logical_and(
                 bvals >= -20, bvals <= 20)]

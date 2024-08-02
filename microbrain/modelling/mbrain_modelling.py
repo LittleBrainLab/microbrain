@@ -120,7 +120,7 @@ def output_DTI_maps_multishell(fname, fmask, bvals, bvecs, tensorDir, shells=[0,
     if not os.path.exists(fa_fname):
 
         img = nib.load(fname)
-        data = img.get_fdata()
+        data = img.get_fdata(dtype=np.float32)
 
         mask_img = nib.load(fmask)
         mask_data = mask_img.get_fdata()
@@ -243,7 +243,7 @@ def output_DKI_maps(fname, fmask, bvals, bvecs, dkiDir):
     if not os.path.exists(fa_fname):
 
         img = nib.load(fname)
-        data = img.get_fdata()
+        data = img.get_fdata(dtype=np.float32)
 
         mask_img = nib.load(fmask)
         mask_data = mask_img.get_fdata()
