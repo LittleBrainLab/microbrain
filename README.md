@@ -91,7 +91,9 @@ If you prefer to manually create the subject folder structure or you are working
 
 ---
 
-## Workflow Overview
+## Running Outside of Docker
+
+The `microbrain` pipeline relies on several third-party neuroimaging and scientific libraries to perform its functions. These include FSL for preprocessing and distortion correction, ANTs for image registration, FreeSurfer for cortical segmentation (requires a valid license file), DIPY for diffusion modeling, scilpy for tractography, and MIRTK for surface-based segmentation. To run the pipeline outside Docker, all dependencies must be installed and configured manually, including setting environment variables for FSL and FreeSurfer. For convenience, using the Docker container with pre-installed dependencies is recommended, however here commands for using `microbrain` in a native environment.
 
 ### Step 1: Setup
 
