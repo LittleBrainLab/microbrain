@@ -32,25 +32,27 @@ microbrain is an Python package for analyzing gray matter in diffusion MRI data.
 2. To run microbrain you need:
 
    - A valid FreeSurfer license file usually located at /usr/local/freesurfer/license.txt
-   - A temporary folder (path/to/tmp)
-   - A folder contain diffusion data (path/to/data)
+   - A temporary folder (path/to/tmp) bound to the container's freesurfer subject dorectory
+   - A folder contain diffusion data (path/to/data) bound to /app in the container
 
 3. Run the container:
 
    ```bash
    docker run --rm -it \
-     -v /path/to/data:/data \
-     -v /path/to/tmp:/tmp \
+     -v /path/to/data:/app \
+     -v /path/to/tmp:/usr/local/freesurfer/7.4.1/subjects \
      -v /path/to/freesurfer/license.txt:/usr/local/freesurfer/license.txt \
      scilus/microbrain:2024
    ```
+   
+   Note docker can have trouble reading files from /usr/local/freesurfer, so you may need to copy the license.txt to a readable location prior to using the container.
 
 4. Inside the container, execute the pipeline:
 
    ```bash
-   python microbrain_setup.py -s /data/subject_dir -i /data/dicom_dir
-   python microbrain_run.py -s /data/subject_dir -b [0,1000] --gibbs --dmppca --eddy --mbrain-seg --mbrain-cort
-   python microbrain_scil_track_cellular_bridges.py -s /data/subject_dir
+   python microbrain_setup.py -s /app/subject_dir -i /app/dicom_dir
+   python microbrain_run.py -s /app/subject_dir -b [0,1000] --gibbs --dmppca --eddy --mbrain-seg --mbrain-cort
+   python microbrain_scil_track_cellular_bridges.py -s /app/subject_dir
    ```
 
    Note: the microbrain\_setup.py script is used if dicom data is used as input otherwise setup the subject folder structure manually (see below)
